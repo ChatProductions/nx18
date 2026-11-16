@@ -37,11 +37,11 @@ struct StudioView: View {
                         .font(.footnote.monospaced())
                         .foregroundStyle(.secondary)
 
-                    GroupBox("Assassin's Creed II — Switch") {
+                    GroupBox("Switch game inspection") {
                         VStack(alignment: .leading, spacing: 9) {
-                            Text("The Ezio Collection")
+                            Text("First target: Terminator 2D: NO FATE")
                                 .font(.headline)
-                            Text("Title ID: 0100670014482000")
+                            Text("Terminator: 0100B51020B68000")
                                 .font(.caption.monospaced())
                             Text("Import a base-game NSP to inspect its PFS0 contents. NCA files remain encrypted; title and update verification is not implemented.")
                                 .font(.subheadline)
@@ -263,11 +263,11 @@ struct StudioView: View {
             defer { if scoped { url.stopAccessingSecurityScopedResource() } }
             do {
                 let rows = try NCAHeader.scan(nsp: url, index: index, headerKey: key)
-                let expected = "0100670014482000"
+                let expected = "0100B51020B68000"
                 let hits = rows.filter { $0.titleHex == expected }
                 var details = [
                     "Decrypted NCA headers: " + String(rows.count),
-                    "Ezio Collection title-ID matches: " + String(hits.count)
+                    "Terminator 2D title-ID matches: " + String(hits.count)
                 ]
                 for row in rows.prefix(30) {
                     details.append(row.titleHex + "  " + row.contentLabel + "  " + row.name)
