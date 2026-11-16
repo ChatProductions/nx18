@@ -65,7 +65,8 @@ if (fabs((dw / dh) / ((double)cw / ch) - 1) < 0.01) vp = (MTLViewport){0, 0, dw,
         self._write(self.legacy / "dm/gfx/nvn/legacy/dmsh_chain.h",
                     '#define DMSH_CHAIN "c6c6ac82aed1"\n')
         self._write(self.legacy / "dm/ios/project.yml",
-                    "deploymentTarget: DM_IOS_DEPLOYMENT_TARGET\n")
+                    "deploymentTarget: DM_IOS_DEPLOYMENT_TARGET\n"
+                    "        excludes: [Info.plist]\n")
         self._write(self.shell / f"dm/games/{NEUTRAL}/game.tsv",
                     "title_id\t0000000000000000\nname\tShell\n")
         self._write(self.shell / f"dm/games/{NEUTRAL}/dmsh_chain.h",
@@ -82,6 +83,9 @@ if (fabs((dw / dh) / ((double)cw / ch) - 1) < 0.01) vp = (MTLViewport){0, 0, dw,
         result = apply(self.legacy, self.shell)
         self.assertEqual(result["iOS_minimum"], "17.0")
         self.assertEqual(result["renderer"], "legacy Metal 3")
+        project_text = (self.legacy / "dm/ios/project.yml").read_text()
+        self.assertIn("excludes: [Info.plist, GameMenu.swift]", project_text)
+
         chain = (self.legacy / f"dm/games/{NEUTRAL}/dmsh_chain.h").read_text()
         self.assertIn('c6c6ac82aed1', chain)
         self.assertNotIn('000000000000', chain)
