@@ -14,6 +14,35 @@
 
 **Important: This is not yet a playable AC2 IPA or a full NSP converter.** The NCA decryption/update layering, executable static rewriting, guest service layer, prelinked game binary, NVN integration for BC texture fallback, Metal 3 shader conversion, and final IPA assembly are outstanding. The Studio deliberately does not offer a fake "Play" or "Convert" button. Game code must be linked into a signed iOS-compatible Mach-O before executing; putting an NSP inside an IPA does not port it.
 
+
+## Device-first workflow, Windows fallback
+
+**Priority:** on-device conversion and packaging on the iPhone. Windows is permitted only for tasks that cannot practically be completed on-device. No requirement to download from Apple's Developer website or install the Apple Metal Developer Tools for Windows.
+
+| Task | Preferred location | Alternative |
+| --- | --- | --- |
+| NSP import, PFS0 extraction, NCA header identification | iPhone | Python/LibHac tools on Windows if needed |
+| NSO inspection and static recompilation | iPhone if practical | Windows Python, .NET and LLVM-based tools |
+| Shader translation (NVN/SPIR-V to MSL) | iPhone if practical | Windows SPIRV-Cross or equivalent translator; output **MSL source**, not a Windows-compiled metallib |
+| MSL compilation | iPhone **Metal API** | GitHub-hosted macOS runner if required; never require Metal Developer Tools for Windows |
+| iOS native shell | Reusable unsigned shell | GitHub-hosted Xcode build (this does use Apple Xcode **on GitHub**, not on the user's PC) |
+| Signing/install | User's existing AltStore/LiveContainer workflow | Other compatible Apple-ID sideloader |
+
+The current iOS Studio workflow uses GitHub-hosted Xcode. The Windows tools are separate; using them does not require installing Xcode or signing into the Apple Developer downloads site on the Windows PC.
+
+**Execution/signing limitation:** This hybrid architecture is research-stage. A stock sideloaded iPhone app cannot generate new executable code and run it as unsigned code. We must identify a legitimate prelinked native-image strategy, with required signing/reinstallation, before a fully on-device game build can be claimed. A Windows program alone cannot bypass iOS code-signing.
+
+### Windows-native code preflight (implemented)
+
+After legally extracting your own Switch game's `ExeFS` directory, the basic NSO validation runs with **stock Python 3.9+** and no other software:
+
+```powershell
+python tools/nso_probe.py "C:\Games\Ezio\exefs" -o "ac2_nso_preflight.json"
+python -m unittest discover -s tests -p test_nso_probe.py -v
+```
+
+The preflight checks NSO0 headers and executable segment bounds for `main`, `rtld`, `sdk` and `subsdk*`. It reports section lengths, compression flags and module IDs. It does **not** decrypt NSOs, perform static recompilation, or make AC2 boot. The resulting report does not contain game code or cryptographic keys.
+
 ## Desired end-to-end pipeline
 
 1. Import your legally obtained Switch base game and update on the iPhone.
