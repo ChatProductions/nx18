@@ -59,6 +59,38 @@ struct InspectorSmoke {
         } catch NSPInspectionError.truncated {
             // Expected: too short even for the header.
         }
-        print("PASS: PFS0 index, encrypted NCA extraction, bounds rejection and invalid header")
+        // Deterministic AES-128-XTS vector cross-checked independently
+        // with OpenSSL-backed Python cryptography (XTS tweak is a big-endian sector).
+        let key = (0..<32).map { UInt8($0) }
+        var plain = (0..<0x400).map { UInt8(($0 * 17 + 3) & 255) }
+        plain.replaceSubrange(0x200..<0x204, with: Array("NCA3".utf8))
+        plain[0x205] = 0 // Program
+        let ac2ID: UInt64 = 0x0100670014482000
+        for j in 0..<8 {
+            plain[0x210 + j] = UInt8((ac2ID >> (8 * j)) & 0xff)
+        }
+        let encrypted = try NCAHeader.cryptHeader(plain, headerKey: key, encrypt: true)
+        let first32 = encrypted.prefix(32).map { String(format: "%02x", $0) }.joined()
+        let sector1First32 = encrypted[512..<544].map { String(format: "%02x", $0) }.joined()
+        precondition(first32 == "7bd6eba8dfbce7708a804d5b33a58a50903e0839419393b2d18e00cfb02c1140")
+        precondition(sector1First32 == "87bf7cbe93913cd0c5f150d69c12518ee82edc08a8b4ac90711aab7dca5a0551")
+        let decrypted = try NCAHeader.cryptHeader(encrypted, headerKey: key, encrypt: false)
+        precondition(decrypted == plain)
+        let keyText = "header_key = " + key.map { String(format: "%02x", $0) }.joined()
+        precondition(try NCAHeader.headerKey(from: keyText) == key)
+
+        let ncaName = Data("0123456789abcdef.nca\0".utf8)
+        var nsp = fixture(length: 0x400, fileSize: 0x400)
+        let contentsAt = 16 + 24 + ncaName.count
+        nsp.replaceSubrange(contentsAt..<(contentsAt + 0x400), with: encrypted)
+        try nsp.write(to: sample)
+        let encryptedIndex = try NSPInspector.inspect(url: sample)
+        let titles = try NCAHeader.scan(nsp: sample, index: encryptedIndex,
+                                        headerKey: key)
+        precondition(titles.count == 1)
+        precondition(titles[0].programId == ac2ID)
+        precondition(titles[0].contentLabel == "Program")
+
+        print("PASS: PFS0 index, encrypted NCA extraction, bounds rejection and invalid header and AES-XTS NCA title validation")
     }
 }
