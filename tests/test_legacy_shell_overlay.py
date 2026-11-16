@@ -36,6 +36,8 @@ static char *g_argv[4]; static int g_argc;
                     '        interpolation = [MTLFXFrameInterpolatorDescriptor supportsDevice:device];\n'
                     '        interpolation4 = [MTLFXFrameInterpolatorDescriptor supportsMetal4FX:device];\n'
                     '    }\n')
+        self._write(self.legacy / "dm/ios/Sources/DmGamepad_legacy.inc",
+                    """    if (@available(iOS 27.0, *)) { g_motion.deviceMotionBody = body; g_motion_body = YES; LOG("front end: the phone's motion comes in the pad view's frame (deviceMotionBody)"); }\n""")
         self._write(self.legacy / "dm/gfx/vk/hle_vk.m",
                     "        if (@available(iOS 26.0, tvOS 26.0, macOS 26.0, *)) "
                     "sd.lodBias = fminf(fmaxf(ci->mipLodBias, -15), 15);"
@@ -84,6 +86,8 @@ static char *g_argv[4]; static int g_argc;
         self.assertNotIn("sd.lodBias", metal3vk)
         caps = (self.legacy / "dm/ios/Sources/DmGraphicsCapabilities.h").read_text()
         self.assertNotIn("MTLFXFrameInterpolatorDescriptor", caps)
+        gamepad = (self.legacy / "dm/ios/Sources/DmGamepad_legacy.inc").read_text()
+        self.assertNotIn("g_motion.deviceMotionBody = body", gamepad)
 
 
 
