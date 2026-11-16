@@ -52,6 +52,11 @@ static int nx18_has_signed_pieces(const struct mach_header_64 *mh,
 // from the image selected by dm_set_game_image_header().
 int nx18_guest_prepare(const char **out, int capacity) {
     if (!out || capacity < 1 || capacity > 16) return -1;
+    const char *profile = getenv("DM_PROFILE");
+    if (!profile || access(profile, R_OK)) {
+        fprintf(stderr, "nx18: per-game runtime profile missing; native boot refused\n");
+        return -1;
+    }
     NSString *dir = NSBundle.mainBundle.privateFrameworksPath;
     NSString *path = [dir stringByAppendingPathComponent:@"Guest.framework/Guest"];
     if (!path || access(path.fileSystemRepresentation, R_OK)) {
