@@ -35,6 +35,8 @@ echo '// nx18: signed guest code loaded from Guest.framework, not embedded' > Ge
 touch Gen/dm/placeholder.tsv
 printf '{"info":{"author":"xcode","version":1}}\n' > Gen/Assets.xcassets/Contents.json
 echo 'DM_APPICON =' >> Gen/dm.xcconfig
+# Link every iOS-compatible framework discovered from the real host Makefile.
+echo 'OTHER_LDFLAGS = $(inherited) $(DM_FRAMEWORKS)' >> Gen/dm.xcconfig
 
 python3 - Gen/dm.xcconfig <<'PY'
 import pathlib, sys
