@@ -7,6 +7,8 @@ on:
       - "LegacyShell/**"
       - "tests/test_legacy_shell_overlay.py"
       - ".github/workflows/shell18.yml"
+      - ".github/workflows/native-integration.yml"
+      - "scripts/generate_synthetic_nso.py"
   workflow_dispatch:
 
 permissions:

@@ -1,0 +1,68 @@
+name: Verify real Metal3 host with synthetic native Guest IPA
+
+on:
+  workflow_run:
+    workflows: ["Build native iOS18 Metal3 game-free shell"]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  real-host-package:
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' }}
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout exact native-host source commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Download actual successful Xcode-built iOS17 shell
+        uses: actions/download-artifact@v4
+        with:
+          name: nx18-metal3-gamefree-unsigned
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          path: work/shell
+      - name: Install native ARM64 rewrite dependencies
+        run: python -m pip install "capstone>=5,<6" "lz4>=4,<5"
+      - name: Fetch native upstream rewriter and signed-image generator
+        shell: pwsh
+        run: |
+          git clone --depth 1 --branch ios16-ios17-compat https://github.com/widmonstertony/nxnative.git vendor/nxnative
+          if ($LASTEXITCODE -ne 0) { throw "Legacy upstream unavailable" }
+          git clone --depth 1 --branch main https://github.com/xinerqu/ns2ios-shell.git vendor/shell
+          if ($LASTEXITCODE -ne 0) { throw "Signed-image generator upstream unavailable" }
+          python LegacyShell/apply_legacy_shell.py --legacy vendor/nxnative --shell vendor/shell
+          if ($LASTEXITCODE -ne 0) { throw "Legacy overlay failed" }
+      - name: Create synthetic ARM64 ExeFS, never commercial game data
+        run: python scripts/generate_synthetic_nso.py work/synthetic/exefs
+      - name: Rewrite actual ARM64 instructions for signed native guest
+        run: >-
+          python tools/rewrite_exefs.py
+          work/synthetic/exefs --upstream vendor/nxnative
+          --output work/rewrite --title-id 0100B51020B68000 --jobs 2
+      - name: Build authentic iOS17 native Guest.framework
+        run: >-
+          python tools/build_guest18.py
+          --rewritten work/rewrite --legacy vendor/nxnative --out work/native
+      - name: Package Xcode host with synthetic Guest and check entire IPA
+        run: >-
+          python tests/smoke_native18_packaging.py
+          --legacy vendor/nxnative --rewritten work/rewrite
+          --native work/native
+          --shell work/shell/nx18-metal3-gamefree-unsigned.ipa
+      - name: Publish only synthetic manifest evidence, not a fake playable IPA
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nx18-real-host-synthetic-integration-report
+          path: |
+            work/rewrite/rewrite-manifest.json
+            work/native/guest18-manifest.json
+          if-no-files-found: ignore

@@ -42,7 +42,8 @@ def synthetic_shell(path: Path) -> None:
         z.writestr("Payload/DmIOS.app/DmIOS", macho)
 
 
-def run(legacy: Path, rewritten: Path, native: Path) -> Path:
+def run(legacy: Path, rewritten: Path, native: Path,
+        real_shell: Path | None = None) -> Path:
     head = (legacy / "dm/gfx/nvn/legacy/dmsh_chain.h")
     if not head.exists():
         raise RuntimeError("missing legacy Metal 3 shader-chain header")
@@ -54,7 +55,25 @@ def run(legacy: Path, rewritten: Path, native: Path) -> Path:
     with tempfile.TemporaryDirectory(prefix="nx18-synth-ipa-") as scratch:
         root = Path(scratch)
         shell = root / "shell-scaffold.ipa"
-        synthetic_shell(shell)
+        if real_shell is None:
+            synthetic_shell(shell)
+        else:
+            shell = real_shell.resolve()
+            if not shell.is_file():
+                raise RuntimeError("real Xcode shell artifact missing")
+            with zipfile.ZipFile(shell) as archive:
+                exe = archive.read("Payload/DmIOS.app/DmIOS")
+                if len(exe) < 1000000:
+                    raise RuntimeError("real-shell smoke requires the compiled host binary")
+                header = struct.unpack_from("<IiiIIIII", exe)
+                if header[0] != 0xfeedfacf or header[1] != 0x0100000c or header[3] != 2:
+                    raise RuntimeError("the real shell is not an arm64 Mach-O app")
+                plist = plistlib.loads(archive.read("Payload/DmIOS.app/Info.plist"))
+                if plist.get("MinimumOSVersion") != "17.0":
+                    raise RuntimeError("real shell targets an unexpected iOS release")
+                if any("/Frameworks/" in name or "main.fixups.tsv" in name
+                       for name in archive.namelist()):
+                    raise RuntimeError("real game-free shell unexpectedly carries a guest")
         profile = root / "profile.tsv"
         profile.write_text(
             "title_id\t" + tid + "\n"
@@ -90,8 +109,14 @@ def run(legacy: Path, rewritten: Path, native: Path) -> Path:
             assert len(z.read("Payload/DmIOS.app/Frameworks/Guest.framework/Guest")) > 0
         print("PASS: synthetic title-matched native image, framework, tables, "
               "legacy shader-chain and IPA ZIP staging")
-        print("NOTE: synthetic shell scaffold is not runnable, and this is "
-              "NOT a working Terminator build.")
+        if real_shell:
+            print("PASS: actual Xcode-built iOS17 Metal3 host and synthetic "
+                  "signed-code Guest.framework assembled in one unsigned IPA")
+            print("NOTE: real host + synthetic guest, NOT verified device boot "
+                  "or gameplay; shader and game resources are test-only.")
+        else:
+            print("NOTE: synthetic shell scaffold is not runnable, and this is "
+                  "NOT a working Terminator build.")
         return out
 
 
@@ -100,5 +125,7 @@ if __name__ == "__main__":
     parser.add_argument("--legacy", type=Path, required=True)
     parser.add_argument("--rewritten", type=Path, required=True)
     parser.add_argument("--native", type=Path, required=True)
+    parser.add_argument("--shell", type=Path,
+                        help="Previously built real Xcode Metal3 shell IPA")
     a = parser.parse_args()
-    run(a.legacy, a.rewritten, a.native)
+    run(a.legacy, a.rewritten, a.native, real_shell=a.shell)
