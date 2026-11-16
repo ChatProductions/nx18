@@ -69,8 +69,24 @@ xcodebuild \
   DM_COPY_GAME_RESOURCES=NO DM_COPY_ROMFS=NO \
   DM_XCODE_OUTPUT_ROOT="$OUT/derived" \
   build > "$OUT/xcodebuild.log" 2>&1 || {
-    grep -E 'error:|warning:' "$OUT/xcodebuild.log" | tail -35 || true
-    echo "nx18: native compilation failed; log: $OUT/xcodebuild.log" >&2
+    # A failed 2GB Swift/ObjC build can bury the FIRST relevant compiler
+    # error hundreds of lines before the final failure. Surface context.
+    python3 - "$OUT/xcodebuild.log" <<'PY'
+from pathlib import Path
+import re, sys
+lines = Path(sys.argv[1]).read_text(errors="replace").splitlines()
+errors = [i for i, line in enumerate(lines)
+          if re.search(r"(?<!warning: )error:|fatal error:", line)]
+print("nx18: compiler errors: " + str(len(errors)), file=sys.stderr)
+for index in errors[:12]:
+    for line in lines[max(0, index - 3):min(len(lines), index + 5)]:
+        print(line, file=sys.stderr)
+    print("--", file=sys.stderr)
+if not errors:
+    print("No compiler diagnostics found; final build lines:", file=sys.stderr)
+    print("\n".join(lines[-45:]), file=sys.stderr)
+PY
+    echo "nx18: native compilation failed; complete log: $OUT/xcodebuild.log" >&2
     exit 1
   }
 
