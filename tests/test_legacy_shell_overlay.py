@@ -27,6 +27,8 @@ static char *g_argv[4]; static int g_argc;
 ''')
         self._write(self.legacy / "dm/ios/Sources/Launcher.swift",
                     'if #available(iOS 26.0, *) { button.buttonStyle(.glassProminent) } else { button.buttonStyle(.borderedProminent) }\n')
+        # The real upstream tree has dm/tools; the synthetic test fixture must too.
+        (self.legacy / "dm/tools").mkdir(parents=True, exist_ok=True)
         self._write(self.legacy / "dm/host/loader_legacy.inc",
                     "int dm_set_game_image_header(const void *header) { return 1; }\n")
         self._write(self.legacy / "dm/gfx/nvn/nvn_mtl_legacy.inc",
