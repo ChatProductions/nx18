@@ -31,6 +31,10 @@ static char *g_argv[4]; static int g_argc;
         (self.legacy / "dm/tools").mkdir(parents=True, exist_ok=True)
         self._write(self.legacy / "dm/host/loader_legacy.inc",
                     "int dm_set_game_image_header(const void *header) { return 1; }\n")
+        self._write(self.legacy / "dm/gfx/vk/hle_vk.m",
+                    "        if (@available(iOS 26.0, tvOS 26.0, macOS 26.0, *)) "
+                    "sd.lodBias = fminf(fmaxf(ci->mipLodBias, -15), 15);"
+                    "   // Metal 26's sampler bias; the device reports maxSamplerLodBias 15\n")
         self._write(self.legacy / "dm/gfx/nvn/nvn_mtl_legacy.inc",
                     "#ifdef DM_SHELL\nnewLibraryWithSource\n#endif\n")
         self._write(self.legacy / "dm/gfx/nvn/legacy/dmsh_chain.h",
@@ -71,6 +75,9 @@ static char *g_argv[4]; static int g_argc;
         launcher = (self.legacy / "dm/ios/Sources/Launcher.swift").read_text()
         self.assertIn("button.buttonStyle(.borderedProminent)", launcher)
         self.assertNotIn(".glassProminent", launcher)
+        metal3vk = (self.legacy / "dm/gfx/vk/hle_vk.m").read_text()
+        self.assertNotIn("sd.lodBias", metal3vk)
+
 
 
     def test_fail_closed_on_new_unrecognized_upstream(self):
