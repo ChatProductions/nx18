@@ -45,6 +45,16 @@ jobs:
         run: |
           python3 LegacyShell/apply_legacy_shell.py \
             --legacy vendor/legacy --shell vendor/shell
+      - name: Reject newer iOS26-only APIs in the Metal3 backport
+        run: |
+          if grep -q 'sd.lodBias' vendor/legacy/dm/gfx/vk/hle_vk.m; then
+            echo "Metal26 sampler API still present in iOS17 Vulkan fallback"
+            exit 1
+          fi
+          if grep -R -q '.glassProminent' vendor/legacy/dm/ios/Sources; then
+            echo "SwiftUI26 glass button style still present in iOS17 launcher"
+            exit 1
+          fi
       - name: Build unsigned native iOS17 host using hosted Xcode
         id: build
         run: |
