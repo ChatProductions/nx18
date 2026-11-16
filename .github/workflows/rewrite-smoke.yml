@@ -4,6 +4,8 @@ on:
     branches: [main]
     paths:
       - "tools/rewrite_exefs.py"
+      - "tools/build_guest18.py"
+      - "LegacyShell/**"
       - "tools/nso_probe.py"
       - "tests/test_rewrite_exefs.py"
       - "tests/test_nso_probe.py"
@@ -31,6 +33,10 @@ jobs:
           git clone --filter=blob:none --depth 1 --branch ios16-ios17-compat https://github.com/widmonstertony/nxnative.git vendor/nxnative
           if ($LASTEXITCODE -ne 0) { throw "Failed to clone legacy nxnative fork" }
           git -C vendor/nxnative rev-parse HEAD
+      - name: Prepare iOS17 Guest framework generator from open source
+        run: |
+          git clone --depth 1 --branch main https://github.com/xinerqu/ns2ios-shell.git vendor/shell
+          python LegacyShell/apply_legacy_shell.py --legacy vendor/nxnative --shell vendor/shell
       - name: Generate non-copyrighted synthetic Switch ARM64 module
         shell: pwsh
         run: |
@@ -61,6 +67,27 @@ jobs:
           --output work/rewrite
           --title-id 0100670014482000
           --jobs 2
+      - name: Build iOS17 signed-code Guest.framework from rewritten ARM64 module
+        run: >
+          python tools/build_guest18.py
+          --rewritten work/rewrite
+          --legacy vendor/nxnative
+          --out work/native
+      - name: Verify framework Mach-O targets iOS17, not 26
+        shell: pwsh
+        run: |
+          @'
+          import json
+          from pathlib import Path
+          from tools.build_guest18 import macho_minos, MINOS_17
+          lib = Path("work/native/Guest.framework/Guest")
+          report = json.loads(Path("work/native/guest18-manifest.json").read_text())
+          assert macho_minos(lib) == MINOS_17
+          assert report["modules"] == ["main"]
+          assert not report["embedded_in_ipa"]
+          print("PASS: signed native ARM64 guest code container targets iOS17.")
+          '@ | python -
+          if ($LASTEXITCODE -ne 0) { throw "Guest framework validation failed" }
       - name: Check native output and manifest
         shell: pwsh
         run: |
@@ -82,5 +109,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: nx18-native-rewrite-smoke-report
-          path: work/rewrite/rewrite-manifest.json
+          path: |
+            work/rewrite/rewrite-manifest.json
+            work/native/guest18-manifest.json
           if-no-files-found: ignore
