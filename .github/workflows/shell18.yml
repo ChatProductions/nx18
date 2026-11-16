@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "LegacyShell/**"
+      - "tests/test_legacy_shell_overlay.py"
       - ".github/workflows/shell18.yml"
   workflow_dispatch:
 
