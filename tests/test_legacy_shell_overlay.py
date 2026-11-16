@@ -49,7 +49,9 @@ static char *g_argv[4]; static int g_argc;
                     "        if (@available(iOS 26.0, tvOS 26.0, macOS 26.0, *)) "
                     "sd.lodBias = fminf(fmaxf(ci->mipLodBias, -15), 15);"
                     "   // Metal 26's sampler bias; the device reports maxSamplerLodBias 15\n")
-        self._write(self.legacy / "dm/gfx/nvn/nvn_mtl_legacy.inc",
+        self._write(self.legacy / "dm/gfx/nvn/nvn_mtl.m",
+                    '#include "legacy/nvn_mtl_legacy.inc"\n')
+        self._write(self.legacy / "dm/gfx/nvn/legacy/nvn_mtl_legacy.inc",
                     "#ifdef DM_SHELL\nnewLibraryWithSource\n#endif\nstatic uint64_t g_pq_in;\n")
         self._write(self.legacy / "dm/gfx/nvn/legacy/dmsh_chain.h",
                     '#define DMSH_CHAIN "c6c6ac82aed1"\n')
@@ -93,7 +95,7 @@ static char *g_argv[4]; static int g_argc;
         self.assertNotIn("sd.lodBias", metal3vk)
         caps = (self.legacy / "dm/ios/Sources/DmGraphicsCapabilities.h").read_text()
         self.assertNotIn("MTLFXFrameInterpolatorDescriptor", caps)
-        render = (self.legacy / "dm/gfx/nvn/nvn_mtl_legacy.inc").read_text()
+        render = (self.legacy / "dm/gfx/nvn/legacy/nvn_mtl_legacy.inc").read_text()
         self.assertIn("void mtl_present_progress", render)
         self.assertIn("*queued = g_pq_in", render)
         self.assertIn("*done = g_pq_done", render)
