@@ -1,8 +1,11 @@
-# nx18 native AC2 (Switch) pipeline — current engineering branch
+# nx18 general Switch-native pipeline — current engineering branch
 
-Target: Nintendo Switch *Assassin's Creed II* within *The Ezio Collection*, title
-`0100670014482000`, running offline as **native ARM64 code** on iPhone 13 /
-iOS 18.7.8. **No Switch emulator, cloud streaming, or runtime JIT.**
+**First game:** Terminator 2D: NO FATE (`0100B51020B68000`).
+**Fallback:** Need for Speed: Hot Pursuit Remastered (`010029B0118E8000`).
+**End goal, deferred for storage:** Assassin's Creed II / The Ezio Collection (`0100670014482000`).
+Target iPhone: iPhone 13 / A15 / iOS 18.7.8. **No Switch emulator, cloud streaming or JIT.**
+
+The Windows rewriter, native framework generator and IPA packer now select their game from a verified base title ID; they reject cross-game mixes.
 
 Development priority: finish the real native runtime, not a standalone NSP inspector.
 The optional Studio inspector remains independent of the actual port.
@@ -36,7 +39,7 @@ The optional Studio inspector remains independent of the actual port.
    The **user's Windows PC needs no Apple Developer downloads**.
 6. **Native package assembly** (`tools/package_native18.py`): locally
    combines that host, Guest.framework, rewritten fixup/gate tables,
-   an AC2 runtime game profile, a compatible Metal shader chain, and
+   a target-game runtime profile, a compatible Metal shader chain, and
    optionally RomFS into an **unsigned** IPA. The entire modified
    package and nested framework must be re-signed by the sideloader.
 
@@ -63,8 +66,8 @@ The Windows setup script clones the real rewriter and framework generator:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\setup-windows.ps1
-python .\tools\rewrite_exefs.py "F:\AC2\exefs" --upstream .\vendor\nxnative --output .\work\rewrite
-python .\tools\build_guest18.py --rewritten .\work\rewrite --legacy .\vendor\nxnative --out .\work\native
+python .\tools\rewrite_exefs.py "F:\Terminator\exefs" --upstream .\vendor\nxnative --title-id 0100B51020B68000 --output .\work\rewrite
+python .\tools\build_guest18.py --rewritten .\work\rewrite --legacy .\vendor\nxnative --target terminator --out .\work\native
 ```
 
 This presupposes your own legally extracted/decrypted ExeFS. It is **not**
@@ -75,7 +78,7 @@ libraries have been generated, the offline packer accepts them and the
 successful GitHub Actions host build:
 
 ```powershell
-python .\tools\package_native18.py --shell .\nx18-metal3-gamefree-unsigned.ipa --guest .\work\native\Guest.framework --rewritten .\work\rewrite --profile .\AC2\profile.tsv --shader-tables .\AC2\shaders\tables --shaders .\AC2\shaders\b-CHAIN --legacy-chain-header .\vendor\nxnative\dm\gfx\nvn\legacy\dmsh_chain.h --romfs .\AC2\RomFS.img --output .\AC2-native18-unsigned.ipa
+python .\tools\package_native18.py --shell .\nx18-metal3-gamefree-unsigned.ipa --guest .\work\native\Guest.framework --rewritten .\work\rewrite --profile .\Terminator\profile.tsv --shader-tables .\Terminator\shaders\tables --shaders .\Terminator\shaders\b-CHAIN --legacy-chain-header .\vendor\nxnative\dm\gfx\nvn\legacy\dmsh_chain.h --romfs .\Terminator\RomFS.img --output .\Terminator-native18-unsigned.ipa
 ```
 
 `b-CHAIN` is a placeholder: it must match the actual value of
@@ -90,20 +93,20 @@ Nintendo keys to a public CI artifact.
 
 - No confirmed **successful shell18 GitHub Actions compilation** or
   device installation is claimed in this document.
-- The Switch AC2 base game and update have **not yet completed**
+- The first-game Terminator Switch base game and update have **not yet completed**
   extracted-NCA → rewritten-NSO → shader-chain → playable IPA integration
   on the user's iPhone 13.
 - A legacy NVN shader translation chain compatible with the iOS 17
-  renderer must be generated and validated for AC2. **Metal source
+  renderer must be generated and validated for Terminator (or another selected game). **Metal source
   compilation is not identical to shader translation.**
 - Some Horizon service behavior, actual memory headroom, A15 BC texture
   handling, save data, audio, controller support, and frame pacing will
-  need AC2-specific runtime tests.
+  need game-specific runtime tests.
 - The unsigned nested-framework IPA still requires proper signing before
   iOS will allow dyld to map the game image. There is no claimed way to
   sidestep iOS code signing, no JIT, and no emulator.
 
 The milestone after source-level loader integration is a **successful
 compilation of the actual Metal3 native host**, followed by staging the
-actual AC2 graphics assets and game profile—not another independent
+actual Terminator graphics assets and game profile—not another independent
 inspection application.
