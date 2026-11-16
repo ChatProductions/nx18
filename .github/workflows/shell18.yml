@@ -35,9 +35,27 @@ jobs:
           xcodebuild -version
       - name: Fetch real Metal3 host and game-free packaging source
         run: |
-          git clone --depth 1 --branch ios16-ios17-compat \
+          set -euo pipefail
+          clone_retry() {
+            local branch="$1" url="$2" destination="$3"
+            for attempt in 1 2 3 4; do
+              rm -rf "$destination"
+              if git -c http.lowSpeedLimit=1000 -c http.lowSpeedTime=60 clone \
+                  --depth 1 --branch "$branch" "$url" "$destination"; then
+                test -d "$destination/.git"
+                return 0
+              fi
+              echo "::warning::Transient checkout failure for $url (attempt $attempt/4)"
+              if [ "$attempt" -eq 4 ]; then
+                echo "::error::Failed to fetch $url after four attempts"
+                return 1
+              fi
+              sleep $((attempt * 6))
+            done
+          }
+          clone_retry ios16-ios17-compat \
             https://github.com/widmonstertony/nxnative.git vendor/legacy
-          git clone --depth 1 --branch main \
+          clone_retry main \
             https://github.com/xinerqu/ns2ios-shell.git vendor/shell
           echo "Legacy source:"
           git -C vendor/legacy rev-parse HEAD
