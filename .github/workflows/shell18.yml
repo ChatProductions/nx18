@@ -55,6 +55,10 @@ jobs:
             echo "SwiftUI26 glass button style still present in iOS17 launcher"
             exit 1
           fi
+          if grep -R -q 'MTLFXFrameInterpolatorDescriptor' vendor/legacy/dm/ios/Sources; then
+            echo "MetalFX iOS26 frame interpolator still referenced in iOS17 host"
+            exit 1
+          fi
       - name: Build unsigned native iOS17 host using hosted Xcode
         id: build
         run: |
