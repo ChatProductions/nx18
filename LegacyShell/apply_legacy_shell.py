@@ -225,6 +225,26 @@ static char *g_argv[20]; static int g_argc;""",
     if src.count(old_unload) != 1:
         raise RuntimeError("legacy JIT service teardown changed upstream")
     jit.write_text(src.replace(old_unload, new_unload), encoding="utf-8")
+    # iOS17 Metal3 uses loader_legacy.inc, which has no JIT layout/serve
+    # implementation. The modern hle_jit.c calls dm_jit_serve_dir() even
+    # though the legacy loader never defines it: an arm64 link failure.
+    # This is deliberately NOT a fake service provider. Reject nn::jit at
+    # runtime until a truly signed offline JIT-image pipeline is integrated.
+    # macOS retains upstream capture/serve behavior unchanged.
+    jit_source = jit.read_text(encoding="utf-8")
+    serve_call = "    const char *serve = dm_jit_serve_dir();"
+    if jit_source.count(serve_call) != 1:
+        raise RuntimeError("upstream nn::jit serve entry changed; review legacy compatibility")
+    jit_source = jit_source.replace(serve_call, """    const char *serve = NULL;
+#if TARGET_OS_IPHONE
+    // Legacy iOS17 loader cannot reserve/map an offline signed JIT image.
+    // Never silently attempt dynamic code generation on a sideloaded iPhone.
+    die("nx18 iOS17: nn::jit requires offline signed-image integration");
+#else
+    serve = dm_jit_serve_dir();
+#endif""", 1)
+    jit.write_text(jit_source, encoding="utf-8")
+
 
     # The newer vi::ListFrameHistory service reads queued/completed
     # presentation ticket counts. The legacy Metal3 renderer already owns

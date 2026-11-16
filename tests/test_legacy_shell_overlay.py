@@ -35,7 +35,8 @@ static char *g_argv[4]; static int g_argc;
         # The real upstream tree has dm/tools; the synthetic test fixture must too.
         (self.legacy / "dm/tools").mkdir(parents=True, exist_ok=True)
         self._write(self.legacy / "dm/host/hle_jit.c",
-                    """    if (e->plugin) {
+                    """    const char *serve = dm_jit_serve_dir();
+    if (e->plugin) {
         if (e->plugin->fini) ((void (*)(void))(e->plugin->base + e->plugin->fini))();
         nro_unload_alone(e->plugin);   // the loader's: under its locks, with its check of stacks borrowing the plugin's data
         munmap((void *)e->rx, e->rx_size);
@@ -135,6 +136,10 @@ if (fabs((dw / dh) / ((double)cw / ch) - 1) < 0.01) vp = (MTLViewport){0, 0, dw,
         self.assertIn("cannot unload JIT NRO plugins", jit)
         self.assertIn("#else", jit)
         self.assertIn("nro_unload_alone(e->plugin)", jit)
+        self.assertIn('die("nx18 iOS17: nn::jit requires offline signed-image integration")', jit)
+        self.assertIn("serve = dm_jit_serve_dir();", jit)
+        self.assertNotIn("const char *serve = dm_jit_serve_dir();", jit)
+
 
 
 
@@ -148,6 +153,14 @@ if (fabs((dw / dh) / ((double)cw / ch) - 1) < 0.01) vp = (MTLViewport){0, 0, dw,
     def test_refuse_missing_legacy_chain(self):
         (self.legacy / "dm/gfx/nvn/legacy/dmsh_chain.h").unlink()
         with self.assertRaisesRegex(RuntimeError, "missing upstream"):
+            apply(self.legacy, self.shell)
+
+    def test_reject_unrecognized_jit_entry(self):
+        jit = self.legacy / "dm/host/hle_jit.c"
+        jit.write_text(jit.read_text().replace(
+            "const char *serve = dm_jit_serve_dir();",
+            "const char *serve = get_other_serve_dir();"))
+        with self.assertRaisesRegex(RuntimeError, "nn::jit serve entry changed"):
             apply(self.legacy, self.shell)
 
     def test_no_double_patch(self):
