@@ -1,6 +1,6 @@
 # nx18
 
-**Experimental Switch-native recompilation for iPhone 13 / iOS 18.7.8.** The target game is the **Nintendo Switch** release of *Assassin's Creed II* in *The Ezio Collection* (title ID `0100670014482000`). No console emulator, streaming, or runtime JIT.
+**Experimental native Switch-to-iOS recompilation targeting iPhone 13 / iOS 18.7.8.** First game: **Terminator 2D: NO FATE** (`0100B51020B68000`). Fallback: **Need for Speed: Hot Pursuit Remastered** (`010029B0118E8000`). Long-term objective: **Assassin's Creed II** (`0100670014482000`), deferred until storage is available. No console emulator, streaming or JIT.
 
 ## Development track: native Metal 3 host and signed game code
 
@@ -39,14 +39,14 @@ The code is generic but **no game has been verified playable on iPhone 13**. Exi
 
 - An **on-device iOS Studio** targeting **iOS 17+** (including iOS 18.7.8), built as an **unsigned IPA in GitHub Actions**, so you do not need Xcode or the Apple Developer download portal on Windows.
 - A **real, bounds-checked PFS0/NSP indexer and streaming extractor** on-device. It reads the container and can copy encrypted NCA/ticket files locally without uploading keys, ROMs or account information.
-- **Local `prod.keys` import** to AES-XTS-decode **only NCA headers**, identify the actual Switch ProgramId, and compare it to the Ezio Collection title ID. Keys are kept in session memory, never committed or shared; game content remains encrypted.
+- **Local `prod.keys` import** to AES-XTS-decode **only NCA headers**, identify the actual Switch ProgramId, and compare it to the current Terminator first-test title ID. Keys are kept in session memory, never committed or shared; game content remains encrypted.
 - An on-device **Metal Shading Language compiler + render-pass probe**: uses the iPhone GPU to compile an original triangle shader and submit a completed offscreen draw, **without Metal Developer Tools for Windows**. This tests the technique, not Switch graphics.
 - A pure Swift **BC1 and BC3 to RGBA8 decoder** intended as an A15 GPU texture-format fallback, with edge-block and alpha tests. It is not yet wired into the NVN renderer.
 - A macOS smoke test for the indexer, NCA header cryptography and texture decoding.
 - A CI audit of a real **Metal 3 / iOS 16.1** nxnative derivative to anchor the legacy runtime work.
 - A **Windows native static-rewrite adapter** to the real `widmonstertony/nxnative` `patch_nso.py` engine (Capstone 5). It generates `*.patched.bin`, `*.fixups.tsv` and gate data, plus a reproducibility manifest from a locally decrypted ExeFS. A [Windows CI smoke workflow](.github/workflows/rewrite-smoke.yml) exercises it on a synthetic ARM64 module.
 
-**Important: This is not yet a playable AC2 IPA or a full NSP converter.** The NCA payload decryption/update layering, **on-device** executable rewriting, guest service layer, prelinked game binary, NVN integration for BC texture fallback, Metal 3 shader conversion, and final IPA assembly are outstanding. The Windows rewriter is **wired up but not yet AC2-tested or iOS-linked**. The Studio deliberately does not offer a fake "Play" or "Convert" button. Game code must be linked into a signed iOS-compatible Mach-O before executing; putting an NSP inside an IPA does not port it.
+**Important: This is not yet a playable Terminator, NFS HP or AC2 IPA, nor a full NSP converter.** The NCA payload decryption/update layering, **on-device** executable rewriting, guest service layer, prelinked game binary, NVN integration for BC texture fallback, Metal 3 shader conversion, and final IPA assembly are outstanding. The Windows rewriter is **wired up but not yet AC2-tested or iOS-linked**. The Studio deliberately does not offer a fake "Play" or "Convert" button. Game code must be linked into a signed iOS-compatible Mach-O before executing; putting an NSP inside an IPA does not port it.
 
 
 ### Windows ARM64 rewrite stage (now wired to actual nxnative source)
