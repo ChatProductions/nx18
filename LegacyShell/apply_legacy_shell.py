@@ -36,15 +36,15 @@ def apply(legacy: Path, shell: Path) -> dict:
     missing = [str(p) for p in needed if not p.is_file()]
     if missing:
         raise RuntimeError("missing upstream file(s): " + ", ".join(missing))
-    if "int dm_set_game_image_header(const void *header)" not in loader.read_text():
+    if "int dm_set_game_image_header(const void *header)" not in loader.read_text(encoding="utf-8"):
         raise RuntimeError("legacy host is missing its external image setter")
-    metal = renderer.read_text()
+    metal = renderer.read_text(encoding="utf-8")
     if "newLibraryWithSource" not in metal or "#ifdef DM_SHELL" not in metal:
         raise RuntimeError("expected iOS17 on-device MSL compiler branch is missing")
-    if "DM_IOS_DEPLOYMENT_TARGET" not in project.read_text():
+    if "DM_IOS_DEPLOYMENT_TARGET" not in project.read_text(encoding="utf-8"):
         raise RuntimeError("legacy project cannot be retargeted to iOS17")
 
-    original = main_file.read_text()
+    original = main_file.read_text(encoding="utf-8")
     if "NX18_SHELL" in original:
         raise RuntimeError("already patched; use a fresh legacy checkout")
 
@@ -149,7 +149,7 @@ static char *g_argv[20]; static int g_argc;""",
 
     # Reuse upstream's actual Mach-O generator; change both the on-disk
     # LC_BUILD_VERSION and the plist minimum OS. Its original is iOS26.
-    guest_source = (shell / "dm/tools/guest_dylib.py").read_text()
+    guest_source = (shell / "dm/tools/guest_dylib.py").read_text(encoding="utf-8")
     guest_source = replace_one(guest_source,
         "MIN_IOS = 26 << 16", "MIN_IOS = 17 << 16",
         "Guest framework Mach-O deployment target")
