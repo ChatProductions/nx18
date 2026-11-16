@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: read
+  statuses: write
 
 jobs:
   native-shell:
@@ -43,6 +44,7 @@ jobs:
           python3 LegacyShell/apply_legacy_shell.py \
             --legacy vendor/legacy --shell vendor/shell
       - name: Build unsigned native iOS17 host using hosted Xcode
+        id: build
         run: |
           bash LegacyShell/build_shell18.sh vendor/legacy "$GITHUB_WORKSPACE/build/shell18"
       - name: Record minimal runtime audit
@@ -69,3 +71,45 @@ jobs:
           name: nx18-metal3-gamefree-unsigned
           path: build/shell18/nx18-metal3-gamefree-unsigned.ipa
           if-no-files-found: error
+
+      # Publish an authoritative native-host result on the exact Git commit.
+      # The GitHub connector can then inspect it without relying on Actions
+      # UI scraping. Runs with no game files and no external secrets.
+      - name: Publish machine-readable Metal3 build result
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          REVISION: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request
+          from pathlib import Path
+          okay = (
+              os.environ.get("BUILD_OUTCOME") == "success"
+              and Path("build/shell18/nx18-metal3-gamefree-unsigned.ipa").is_file()
+          )
+          body = {
+              "state": "success" if okay else "failure",
+              "context": "nx18/metal3-native-shell",
+              "description": ("Native iOS17 Metal3 host IPA built"
+                              if okay else "Native host not built; see CI diagnostics"),
+              "target_url": "https://github.com/{}/actions/runs/{}".format(
+                  os.environ["REPOSITORY"], os.environ["RUN_ID"]),
+          }
+          url = "https://api.github.com/repos/{}/statuses/{}".format(
+              os.environ["REPOSITORY"], os.environ["REVISION"])
+          request = urllib.request.Request(url, method="POST",
+              data=json.dumps(body).encode(),
+              headers={
+                  "Accept": "application/vnd.github+json",
+                  "Authorization": "Bearer " + os.environ["GH_TOKEN"],
+                  "X-GitHub-Api-Version": "2022-11-28",
+                  "Content-Type": "application/json",
+              })
+          with urllib.request.urlopen(request, timeout=20) as response:
+              print("Published status:", body["context"], body["state"],
+                    response.status)
+          PY
