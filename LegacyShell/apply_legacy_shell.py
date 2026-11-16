@@ -291,6 +291,21 @@ bool dm_setting_live(const char *env, const char *value) {
 """
     legacy_front.write_text(front, encoding="utf-8")
 
+    # Modern GameMenu's Quit item relies on the modern UIKit quit-prompt
+    # state machine (dm_quit_menu), absent from front_ios_legacy.inc.
+    # Do not fake it with exit(0) and risk discarding the game's save data.
+    # The iOS system Home gesture remains available to leave the app.
+    menu_path = legacy / "dm/ios/Sources/GameMenu.swift"
+    if not menu_path.is_file():
+        raise RuntimeError("legacy GameMenu Swift source is missing")
+    menu = menu_path.read_text(encoding="utf-8")
+    quit_item = "items.append(Unmanaged<UIMenu>.fromOpaque(dm_quit_menu()).takeRetainedValue())"
+    if menu.count(quit_item) != 1:
+        raise RuntimeError("legacy in-game Quit menu call changed upstream")
+    menu = menu.replace(quit_item,
+        "// nx18 legacy iOS17/18: modern quit prompt absent; omit unsafe quit action.")
+    menu_path.write_text(menu, encoding="utf-8")
+
     main_file.write_text(updated, encoding="utf-8")
     shutil.copyfile(HERE / "NX18Guest.m",
                     legacy / "dm/ios/Sources/NX18Guest.m")
