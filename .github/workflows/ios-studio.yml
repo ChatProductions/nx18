@@ -19,6 +19,11 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: "16.4"
+      - name: Show pinned toolchain
+        run: xcodebuild -version
       - name: Test PFS0 inspector on macOS
         run: |
           swiftc -parse-as-library Studio/NSPInspector.swift Studio/NSPExtractor.swift Studio/NCAHeader.swift Tests/InspectorSmoke.swift -o /tmp/nx18-inspector-smoke
