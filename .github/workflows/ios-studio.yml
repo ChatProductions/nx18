@@ -1,0 +1,33 @@
+name: iOS 18 on-device studio
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Studio/**"
+      - "Tests/**"
+      - "scripts/build_studio.sh"
+      - ".github/workflows/ios-studio.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-studio:
+    name: Build unsigned iOS 17+ IPA
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test PFS0 inspector on macOS
+        run: |
+          swiftc -parse-as-library Studio/NSPInspector.swift Tests/InspectorSmoke.swift -o /tmp/nx18-inspector-smoke
+          /tmp/nx18-inspector-smoke
+      - name: Compile unsigned iOS app
+        run: bash scripts/build_studio.sh
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: nx18-studio-unsigned-ipa
+          path: build/ios/nx18-studio-unsigned.ipa
+          if-no-files-found: error
