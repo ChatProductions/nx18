@@ -19,7 +19,8 @@ import tempfile
 import zipfile
 from pathlib import Path
 
-from build_guest18 import EXPECTED_TITLE, MINOS_17, macho_minos
+from build_guest18 import MINOS_17, macho_minos, digest
+from game_targets import resolve_target, target_from_id, title_id
 
 TABLES = ("shader_map.tsv", "c1_full.tsv", "cb_extent.tsv",
           "shader_pairs.tsv", "pso_pairs.tsv", "pso_manifest.tsv")
@@ -55,15 +56,17 @@ def unpack_shell(archive: Path, root: Path) -> Path:
     return app
 
 
-def parse_profile(path: Path) -> dict[str, str]:
+def parse_profile(path: Path, expected_title: str | None = None) -> dict[str, str]:
     fields = {}
     for line in path.read_text(encoding="utf-8-sig").splitlines():
         if not line.strip() or line.lstrip().startswith("#"): continue
         part = line.split("\t", 1)
         if len(part) < 2: raise ValueError("invalid runtime game profile TSV")
         fields[part[0]] = part[1].strip()
-    if fields.get("title_id", "").upper() != EXPECTED_TITLE:
-        raise ValueError("runtime profile is not the Ezio Collection base title")
+    recorded = title_id(fields.get("title_id", ""))
+    if expected_title and recorded != expected_title:
+        raise ValueError("runtime profile title ID disagrees with the selected game")
+    fields["title_id"] = recorded
     for name in ("program_id", "modules", "romfs_marker", "mem_reserve",
                  "app_pool"):
         if not fields.get(name):
@@ -82,12 +85,18 @@ def chain_from_header(path: Path) -> str:
 def package(shell: Path, guest: Path, rewritten: Path,
             profile: Path, shader_tables: Path, shaders: Path,
             legacy_chain_header: Path, output: Path,
-            romfs: Path | None = None, control: Path | None = None) -> dict:
+            romfs: Path | None = None, control: Path | None = None,
+            target_id: str | None = None) -> dict:
     for path in (shell, profile, legacy_chain_header):
         if not path.is_file(): raise ValueError("missing input " + str(path))
     if not guest.is_dir() or not rewritten.is_dir() or not shader_tables.is_dir():
         raise ValueError("missing native guest, rewritten modules or shader tables")
-    fields = parse_profile(profile)
+    rewrite_manifest = json.loads(
+        (rewritten / "rewrite-manifest.json").read_text(encoding="utf-8"))
+    target = resolve_target(target_id) if target_id is not None else target_from_id(rewrite_manifest["title_id"])
+    if rewrite_manifest.get("title_id") != target.title_id:
+        raise ValueError("selected game disagrees with the rewritten NSO manifest")
+    fields = parse_profile(profile, expected_title=target.title_id)
     if not (guest / "Guest").is_file():
         raise ValueError("Guest.framework is missing its native binary")
     if macho_minos(guest / "Guest") != MINOS_17:
@@ -97,10 +106,16 @@ def package(shell: Path, guest: Path, rewritten: Path,
     if gp.get("MinimumOSVersion") != "17.0":
         raise ValueError("Guest Info.plist is not iOS 17 compatible")
 
-    rewrite_manifest = json.loads(
-        (rewritten / "rewrite-manifest.json").read_text(encoding="utf-8"))
-    if rewrite_manifest.get("title_id") != EXPECTED_TITLE:
-        raise ValueError("rewritten modules have a different title ID")
+    # Do not combine the code of one Switch game with another game's
+    # framework: the Mach-O itself has no trustworthy embedded title field.
+    guest_manifest_path = guest.parent / "guest18-manifest.json"
+    if not guest_manifest_path.is_file():
+        raise ValueError("missing guest18-manifest.json for native code provenance")
+    guest_manifest = json.loads(guest_manifest_path.read_text(encoding="utf-8"))
+    if guest_manifest.get("title_id") != target.title_id:
+        raise ValueError("Guest.framework belongs to a different Switch title")
+    if guest_manifest.get("image_sha256") != digest(guest / "Guest"):
+        raise ValueError("Guest.framework binary does not match signed-code manifest")
     module_names = {x["name"] for x in rewrite_manifest["modules"]}
     if "main" not in module_names or not (module_names - {"rtld"}).issubset(
             set(fields["modules"].split())):
@@ -149,8 +164,8 @@ def package(shell: Path, guest: Path, rewritten: Path,
 
         plist = app / "Info.plist"
         with plist.open("rb") as f: info = plistlib.load(f)
-        info["CFBundleDisplayName"] = "Assassin's Creed II"
-        info["CFBundleIdentifier"] = "org.nx18.ac2"
+        info["CFBundleDisplayName"] = target.name
+        info["CFBundleIdentifier"] = target.bundle_id
         with plist.open("wb") as f: plistlib.dump(info, f)
 
         output = output.resolve()
@@ -162,7 +177,8 @@ def package(shell: Path, guest: Path, rewritten: Path,
                 if file.is_file():
                     z.write(file, file.relative_to(root).as_posix())
 
-    return {"output": str(output), "title_id": EXPECTED_TITLE,
+    return {"output": str(output), "title_id": target.title_id,
+            "target_name": target.name, "target_priority": target.priority,
             "guest_modules": sorted(module_names), "legacy_chain": chain,
             "romfs_packed": romfs is not None,
             "unsigned": True, "full_resigning_required": True,
@@ -176,8 +192,10 @@ def main() -> int:
         p.add_argument("--" + flag, required=True, type=Path)
     p.add_argument("--romfs", type=Path)
     p.add_argument("--control", type=Path)
+    p.add_argument("--target", help="Optional game alias/title ID; checked against all input manifests")
     a = p.parse_args()
     args = vars(a)
+    args["target_id"] = args.pop("target")
     args["shader_tables"] = args.pop("shader_tables")
     args["legacy_chain_header"] = args.pop("legacy_chain_header")
     try:
