@@ -9,6 +9,34 @@ struct NX18App: App {
             StudioView()
         }
     }
+
+    private func extractInspected() {
+        guard let url = inspectedURL, let index = inspectedIndex else { return }
+        busy = true
+        status = "Extracting locally. This may use several GB of storage…"
+        Task.detached(priority: .userInitiated) {
+            let scoped = url.startAccessingSecurityScopedResource()
+            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+            do {
+                let documents = FileManager.default.urls(for: .documentDirectory,
+                    in: .userDomainMask)[0]
+                let folder = documents.appendingPathComponent("nx18-extracted", isDirectory: true)
+                    .appendingPathComponent(UUID().uuidString, isDirectory: true)
+                let count = try NSPExtractor.extract(url: url, index: index,
+                                                     destination: folder)
+                await MainActor.run {
+                    busy = false
+                    status = "Extracted " + String(count) +
+                        " encrypted files to Documents/nx18-extracted. No game was ported."
+                }
+            } catch {
+                await MainActor.run {
+                    busy = false
+                    status = "Extraction failed: " + error.localizedDescription
+                }
+            }
+        }
+    }
 }
 
 struct StudioView: View {
@@ -16,6 +44,8 @@ struct StudioView: View {
     @State private var busy = false
     @State private var status = "No NSP imported."
     @State private var report = ""
+    @State private var inspectedURL: URL?
+    @State private var inspectedIndex: NSPIndex?
 
     var body: some View {
         NavigationStack {
@@ -51,7 +81,21 @@ struct StudioView: View {
                     .disabled(busy)
 
                     if busy {
-                        ProgressView("Reading container headers…")
+                        ProgressView("Processing on this iPhone…")
+                    }
+
+                    if inspectedIndex != nil {
+                        Button {
+                            extractInspected()
+                        } label: {
+                            Label("Extract encrypted NSP files", systemImage: "archivebox")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(busy)
+                        Text("Copies NCA and ticket files to Documents/nx18-extracted. This uses additional free storage and does not decrypt them.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
                     }
 
                     Text(status)
@@ -72,7 +116,7 @@ struct StudioView: View {
 
                     GroupBox("Porting status") {
                         VStack(alignment: .leading, spacing: 6) {
-                            Label("PFS0/NSP indexing: implemented", systemImage: "checkmark.circle")
+                            Label("PFS0/NSP indexing and extraction: implemented", systemImage: "checkmark.circle")
                             Label("NCA decryption and updates: not implemented", systemImage: "circle.dashed")
                             Label("ARM64 static rewriting: not implemented", systemImage: "circle.dashed")
                             Label("Metal 3 renderer / A15 texture fallback: not implemented", systemImage: "circle.dashed")
@@ -101,6 +145,8 @@ struct StudioView: View {
     private func inspect(_ url: URL) {
         busy = true
         report = ""
+        inspectedIndex = nil
+        inspectedURL = nil
         status = "Inspecting " + url.lastPathComponent + "…"
         Task.detached(priority: .userInitiated) {
             let scoped = url.startAccessingSecurityScopedResource()
@@ -111,6 +157,8 @@ struct StudioView: View {
                 let index = try NSPInspector.inspect(url: url)
                 await MainActor.run {
                     report = index.report
+                    inspectedURL = url
+                    inspectedIndex = index
                     status = "PFS0 header and file ranges validated. This is not a game compatibility test."
                     busy = false
                 }
