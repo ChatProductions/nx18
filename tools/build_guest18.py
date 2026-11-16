@@ -16,8 +16,7 @@ import re
 import struct
 from pathlib import Path
 
-
-EXPECTED_TITLE = "0100670014482000"
+from game_targets import resolve_target, target_from_id
 LC_BUILD_VERSION = 0x32
 MH_DYLIB = 0x6
 ARM64_CPU = 0x0100000C
@@ -58,14 +57,16 @@ def macho_minos(path: Path, expected_kind: int = MH_DYLIB) -> int:
     raise ValueError("LC_BUILD_VERSION missing")
 
 
-def write_guest(rewritten: Path, legacy: Path, out: Path) -> dict:
+def write_guest(rewritten: Path, legacy: Path, out: Path,
+                target_id: str | None = None) -> dict:
     rewritten, legacy, out = rewritten.resolve(), legacy.resolve(), out.resolve()
     metadata = rewritten / "rewrite-manifest.json"
     if not metadata.is_file():
         raise ValueError("missing rewrite-manifest.json: run rewrite_exefs.py first")
     data = json.loads(metadata.read_text(encoding="utf-8"))
-    if data.get("title_id") != EXPECTED_TITLE:
-        raise ValueError("wrong Switch title ID for AC2 native pipeline")
+    target = resolve_target(target_id) if target_id is not None else target_from_id(data["title_id"])
+    if data.get("title_id") != target.title_id:
+        raise ValueError("target ID does not match the rewritten modules")
     modules = data.get("modules", [])
     names = [m.get("name") for m in modules]
     if not names or "main" not in names or len(set(names)) != len(names):
@@ -94,7 +95,7 @@ def write_guest(rewritten: Path, legacy: Path, out: Path) -> dict:
 
     out.mkdir(parents=True, exist_ok=True)
     framework, nbytes = module.write(str(rewritten), str(out), names,
-                                     bundle_id="org.nx18.ac2.guest", name="Guest")
+                                     bundle_id=target.bundle_id + ".guest", name="Guest")
     library = Path(framework) / "Guest"
     plist = Path(framework) / "Info.plist"
     minos = macho_minos(library)
@@ -103,15 +104,17 @@ def write_guest(rewritten: Path, legacy: Path, out: Path) -> dict:
     if minos != MINOS_17 or plist_data.get("MinimumOSVersion") != "17.0":
         raise ValueError("generated guest framework targets the wrong iOS release")
     result = {
-        "title_id": EXPECTED_TITLE,
+        "title_id": target.title_id,
+        "target_name": target.name,
+        "target_priority": target.priority,
         "guest_framework": str(framework),
         "modules": names,
         "image_bytes": nbytes,
         "image_sha256": digest(library),
         "minimum_ios": "17.0",
-        "native_signed_image_generated": True,
+        "adhoc_signed_macho_generated": True,
         "embedded_in_ipa": False,
-        "iPhone_13_AC2_gameplay_verified": False,
+        "gameplay_verified": False,
     }
     (out / "guest18-manifest.json").write_text(
         json.dumps(result, indent=2) + "\n", encoding="utf-8")
@@ -123,8 +126,9 @@ def main() -> None:
     p.add_argument("--rewritten", required=True, type=Path)
     p.add_argument("--legacy", required=True, type=Path)
     p.add_argument("--out", required=True, type=Path)
+    p.add_argument("--target", help="Optional target alias or 16-digit title ID; checked against rewrite manifest")
     a = p.parse_args()
-    print(json.dumps(write_guest(a.rewritten, a.legacy, a.out), indent=2))
+    print(json.dumps(write_guest(a.rewritten, a.legacy, a.out, target_id=a.target), indent=2))
 
 
 if __name__ == "__main__":
