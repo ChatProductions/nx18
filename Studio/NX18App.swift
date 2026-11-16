@@ -10,33 +10,7 @@ struct NX18App: App {
         }
     }
 
-    private func extractInspected() {
-        guard let url = inspectedURL, let index = inspectedIndex else { return }
-        busy = true
-        status = "Extracting locally. This may use several GB of storage…"
-        Task.detached(priority: .userInitiated) {
-            let scoped = url.startAccessingSecurityScopedResource()
-            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-            do {
-                let documents = FileManager.default.urls(for: .documentDirectory,
-                    in: .userDomainMask)[0]
-                let folder = documents.appendingPathComponent("nx18-extracted", isDirectory: true)
-                    .appendingPathComponent(UUID().uuidString, isDirectory: true)
-                let count = try NSPExtractor.extract(url: url, index: index,
-                                                     destination: folder)
-                await MainActor.run {
-                    busy = false
-                    status = "Extracted " + String(count) +
-                        " encrypted files to Documents/nx18-extracted. No game was ported."
-                }
-            } catch {
-                await MainActor.run {
-                    busy = false
-                    status = "Extraction failed: " + error.localizedDescription
-                }
-            }
-        }
-    }
+
 }
 
 struct StudioView: View {
@@ -166,6 +140,34 @@ struct StudioView: View {
                 await MainActor.run {
                     status = "Inspection failed: " + error.localizedDescription
                     busy = false
+                }
+            }
+        }
+    }
+
+    private func extractInspected() {
+        guard let url = inspectedURL, let index = inspectedIndex else { return }
+        busy = true
+        status = "Extracting locally. This may use several GB of storage…"
+        Task.detached(priority: .userInitiated) {
+            let scoped = url.startAccessingSecurityScopedResource()
+            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+            do {
+                let documents = FileManager.default.urls(for: .documentDirectory,
+                    in: .userDomainMask)[0]
+                let folder = documents.appendingPathComponent("nx18-extracted", isDirectory: true)
+                    .appendingPathComponent(UUID().uuidString, isDirectory: true)
+                let count = try NSPExtractor.extract(url: url, index: index,
+                                                     destination: folder)
+                await MainActor.run {
+                    busy = false
+                    status = "Extracted " + String(count) +
+                        " encrypted files to Documents/nx18-extracted. No game was ported."
+                }
+            } catch {
+                await MainActor.run {
+                    busy = false
+                    status = "Extraction failed: " + error.localizedDescription
                 }
             }
         }
