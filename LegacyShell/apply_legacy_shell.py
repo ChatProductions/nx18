@@ -194,6 +194,24 @@ static char *g_argv[20]; static int g_argc;""",
         raise RuntimeError("legacy JIT service teardown changed upstream")
     jit.write_text(src.replace(old_unload, new_unload), encoding="utf-8")
 
+    # The newer vi::ListFrameHistory service reads queued/completed
+    # presentation ticket counts. The legacy Metal3 renderer already owns
+    # g_pq_in and g_pq_done but lacked the small locked accessor expected by
+    # hle_vi.c. Expose its REAL queue state; do not fabricate frame numbers.
+    mtl = renderer.read_text(encoding="utf-8")
+    progress_anchor = "static uint64_t g_pq_in;"
+    if mtl.count(progress_anchor) != 1 or "void mtl_present_progress(" in mtl:
+        raise RuntimeError("legacy present-queue declaration changed upstream")
+    progress = '''static uint64_t g_pq_in;
+void mtl_present_progress(uint64_t *queued, uint64_t *done) {
+    pthread_mutex_lock(&g_pq_mu);
+    if (queued) *queued = g_pq_in;
+    if (done) *done = g_pq_done;
+    pthread_mutex_unlock(&g_pq_mu);
+}'''
+    renderer.write_text(mtl.replace(progress_anchor, progress, 1),
+                        encoding="utf-8")
+
     main_file.write_text(updated, encoding="utf-8")
     shutil.copyfile(HERE / "NX18Guest.m",
                     legacy / "dm/ios/Sources/NX18Guest.m")
