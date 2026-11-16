@@ -90,9 +90,10 @@ jobs:
         shell: pwsh
         run: |
           @'
-          import json
+          import json, sys
           from pathlib import Path
-          from tools.build_guest18 import macho_minos, MINOS_17
+          sys.path.insert(0, str(Path.cwd() / "tools"))
+          from build_guest18 import macho_minos, MINOS_17
           lib = Path("work/native/Guest.framework/Guest")
           report = json.loads(Path("work/native/guest18-manifest.json").read_text())
           assert macho_minos(lib) == MINOS_17
