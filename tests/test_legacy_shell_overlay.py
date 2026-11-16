@@ -25,6 +25,8 @@ static char *g_argv[4]; static int g_argc;
     g_argv[0] = strdup("dmhost"); g_argv[1] = strdup(dm.fileSystemRepresentation); g_argc = 2;
     dm_host_preload_start(g_argc, g_argv);
 ''')
+        self._write(self.legacy / "dm/ios/Sources/GameMenu.swift",
+                    "items.append(Unmanaged<UIMenu>.fromOpaque(dm_quit_menu()).takeRetainedValue())\n")
         self._write(self.legacy / "dm/ios/Sources/front_ios_legacy.inc",
                     "// Synthetic legacy UIKit host with no live settings.\n")
         self._write(self.legacy / "dm/ios/Sources/Launcher.swift",
@@ -110,6 +112,10 @@ if (fabs((dw / dh) / ((double)cw / ch) - 1) < 0.01) vp = (MTLViewport){0, 0, dw,
         legacy_front = (self.legacy / "dm/ios/Sources/front_ios_legacy.inc").read_text()
         self.assertIn("bool dm_setting_live(const char *env, const char *value)", legacy_front)
         self.assertIn("return false;", legacy_front)
+        menu = (self.legacy / "dm/ios/Sources/GameMenu.swift").read_text()
+        self.assertNotIn("dm_quit_menu()", menu)
+        self.assertIn("modern quit prompt absent", menu)
+
         self.assertIn("void mtl_present_layer(uint32_t w, uint32_t h)", render)
         self.assertIn("atomic_store_explicit(&g_nx18_vi_layer_wh", render)
         self.assertEqual(render.count("nx18_present_aspect(cw, ch"), 2)
