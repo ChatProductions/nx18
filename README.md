@@ -11,8 +11,9 @@
 - A pure Swift **BC1 and BC3 to RGBA8 decoder** intended as an A15 GPU texture-format fallback, with edge-block and alpha tests. It is not yet wired into the NVN renderer.
 - A macOS smoke test for the indexer, NCA header cryptography and texture decoding.
 - A CI audit of a real **Metal 3 / iOS 16.1** nxnative derivative to anchor the legacy runtime work.
+- A **Windows native static-rewrite adapter** to the real `widmonstertony/nxnative` `patch_nso.py` engine (Capstone 5). It generates `*.patched.bin`, `*.fixups.tsv` and gate data, plus a reproducibility manifest from a locally decrypted ExeFS. A [Windows CI smoke workflow](.github/workflows/rewrite-smoke.yml) exercises it on a synthetic ARM64 module.
 
-**Important: This is not yet a playable AC2 IPA or a full NSP converter.** The NCA decryption/update layering, executable static rewriting, guest service layer, prelinked game binary, NVN integration for BC texture fallback, Metal 3 shader conversion, and final IPA assembly are outstanding. The Studio deliberately does not offer a fake "Play" or "Convert" button. Game code must be linked into a signed iOS-compatible Mach-O before executing; putting an NSP inside an IPA does not port it.
+**Important: This is not yet a playable AC2 IPA or a full NSP converter.** The NCA payload decryption/update layering, **on-device** executable rewriting, guest service layer, prelinked game binary, NVN integration for BC texture fallback, Metal 3 shader conversion, and final IPA assembly are outstanding. The Windows rewriter is **wired up but not yet AC2-tested or iOS-linked**. The Studio deliberately does not offer a fake "Play" or "Convert" button. Game code must be linked into a signed iOS-compatible Mach-O before executing; putting an NSP inside an IPA does not port it.
 
 
 ### Windows ARM64 rewrite stage (now wired to actual nxnative source)
