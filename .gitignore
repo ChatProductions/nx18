@@ -1,0 +1,22 @@
+# Never commit game files, keys, device pairings, or signed apps.
+work/
+vendor/
+build/
+*.nsp
+*.xci
+*.nsz
+*.ncz
+*.nca
+*.tik
+*.cert
+*.key
+prod.keys
+title.keys
+*.ipa
+*.mobileprovision
+*.p12
+*.p8
+*.mobiledevicepairing
+__pycache__/
+.pytest_cache/
+.DS_Store
