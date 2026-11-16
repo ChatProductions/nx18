@@ -7,6 +7,8 @@
 #include <mach-o/getsect.h>
 #include <mach-o/loader.h>
 #include <stdlib.h>
+#include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 #include "loader_image.h"
@@ -106,7 +108,8 @@ int nx18_guest_prepare(const char **out, int capacity) {
                         return -1;
                     }
                     strcpy(g_guest_names[n], name);
-                    out[n++] = g_guest_names[n - 1];
+                    out[n] = g_guest_names[n];
+                    n++;
                     if (!strcmp(name, "main")) found_main = 1;
                 }
             }
