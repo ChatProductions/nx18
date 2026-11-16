@@ -6,6 +6,7 @@
 
 - An **on-device iOS Studio** targeting **iOS 17+** (including iOS 18.7.8), built as an **unsigned IPA in GitHub Actions**, so you do not need Xcode or the Apple Developer download portal on Windows.
 - A **real, bounds-checked PFS0/NSP indexer and streaming extractor** on-device. It reads the container and can copy encrypted NCA/ticket files locally without uploading keys, ROMs or account information.
+- **Local `prod.keys` import** to AES-XTS-decode **only NCA headers**, identify the actual Switch ProgramId, and compare it to the Ezio Collection title ID. Keys are kept in session memory, never committed or shared; game content remains encrypted.
 - An on-device **Metal Shading Language compiler + render-pass probe**: uses the iPhone GPU to compile an original triangle shader and submit a completed offscreen draw, **without Metal Developer Tools for Windows**. This tests the technique, not Switch graphics.
 - A Linux/macOS smoke test for the indexer.
 - A CI audit of a real **Metal 3 / iOS 16.1** nxnative derivative to anchor the legacy runtime work.
@@ -25,7 +26,7 @@ The system cannot skip step 3 or code-signing: iOS disallows arbitrary executabl
 
 ## Download and use the Studio
 
-Open [Actions](../../actions/workflows/ios-studio.yml) and select the latest successful run. Download the `nx18-studio-unsigned-ipa` artifact, unpack it and install its IPA through an Apple-ID sideloader that signs unsigned apps. The Studio imports a local `.nsp` from Files; it can extract its encrypted components locally, but **does not decrypt or upload** the game. Its inspection report can be shared for development. An `.xci` is not parsed yet.
+Open [Actions](../../actions/workflows/ios-studio.yml) and select the latest successful run. Download the `nx18-studio-unsigned-ipa` artifact, unpack it and install its IPA through an Apple-ID sideloader that signs unsigned apps. The Studio imports a local `.nsp` from Files; it can extract its encrypted components and, given your own keys, inspect **NCA headers only**. It does not decrypt NCA game data, run the game, or upload files. Its inspection report can be shared for development. An `.xci` is not parsed yet.
 
 If the Actions run fails, its build log is the authority; **do not assume an artifact exists**.
 
