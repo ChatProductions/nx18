@@ -2,6 +2,21 @@
 
 **Experimental Switch-native recompilation for iPhone 13 / iOS 18.7.8.** The target game is the **Nintendo Switch** release of *Assassin's Creed II* in *The Ezio Collection* (title ID `0100670014482000`). No console emulator, streaming, or runtime JIT.
 
+## Development track: native Metal 3 host and signed game code
+
+The project has moved beyond a standalone inspection app. The active codepath is:
+
+- **iOS 17/18 game-free native host**: [LegacyShell](LegacyShell/) backports signed `Guest.framework` loading into the established Metal 3 nxnative runtime, preserving its older iOS deployment target.
+- **Windows native ARM64 rewriting**: [rewrite_exefs.py](tools/rewrite_exefs.py) uses the real existing NSO rewriter; it does not emulate a Switch CPU.
+- **iOS 17 signed-code framework**: [build_guest18.py](tools/build_guest18.py) turns rewritten ARM64 modules into the Mach-O `Guest.framework` consumed by the legacy host.
+- **Game-specific runtime settings**: the shell loads `dm/profile.tsv` so the AC2 program ID, memory layout, RomFS marker, and service parameters do not inherit the shell placeholder.
+- **Offline package assembly**: [package_native18.py](tools/package_native18.py) stages the host, rewritten modules, compatible legacy shader resources, profile and RomFS into an unsigned IPA. The final game IPA still needs signing.
+- **CI host compilation**: [shell18.yml](.github/workflows/shell18.yml) builds the actual native Metal 3 host using a GitHub-hosted Xcode 16.4 runner, not the user's Windows PC.
+
+**Verification boundary:** these are committed integration sources. Successful host compilation, the exact AC2 shader chain, a signed installable game and iPhone 13 gameplay have **not** been confirmed. An unsigned shell or package assembled without matching shaders is not playable.
+
+[Engineering state and exact steps](docs/native18_pipeline.md)
+
 ## What exists today
 
 - An **on-device iOS Studio** targeting **iOS 17+** (including iOS 18.7.8), built as an **unsigned IPA in GitHub Actions**, so you do not need Xcode or the Apple Developer download portal on Windows.
