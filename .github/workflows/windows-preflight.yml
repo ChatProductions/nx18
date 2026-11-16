@@ -1,0 +1,27 @@
+name: Non-Apple Windows preflight
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tools/nso_probe.py"
+      - "tests/test_nso_probe.py"
+      - ".github/workflows/windows-preflight.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-preflight:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify Switch NSO header parser with synthetic test data
+        run: python -m unittest discover -s tests -p test_nso_probe.py -v
+      - name: Show offline command
+        run: python tools/nso_probe.py --help
