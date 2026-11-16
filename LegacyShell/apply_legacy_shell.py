@@ -271,6 +271,26 @@ static int present_encode(id<MTLCommandBuffer> cb, id<MTLTexture> src, id<MTLTex
     mtl = mtl.replace(orig_fill, new_fill)
     renderer.write_text(mtl, encoding="utf-8")
 
+    # The current GameMenu.swift asks front_ios.m whether a Setting can
+    # be changed live. The legacy front_ios_legacy.inc has no such API.
+    # Returning false hides those unsupported rows; controller layout and
+    # Quit remain in the menu. Do NOT report that a setting was applied.
+    legacy_front = legacy / "dm/ios/Sources/front_ios_legacy.inc"
+    if not legacy_front.is_file():
+        raise RuntimeError("legacy front-end source is missing")
+    front = legacy_front.read_text(encoding="utf-8")
+    if "dm_setting_live(" in front:
+        raise RuntimeError("legacy front-end now implements live settings; review backport")
+    front += """
+// nx18 iOS17/18: the modern in-game menu probes for live settings.
+// Legacy frontend has no dynamic setting handler. Hide unsupported entries.
+bool dm_setting_live(const char *env, const char *value) {
+    (void)env; (void)value;
+    return false;
+}
+"""
+    legacy_front.write_text(front, encoding="utf-8")
+
     main_file.write_text(updated, encoding="utf-8")
     shutil.copyfile(HERE / "NX18Guest.m",
                     legacy / "dm/ios/Sources/NX18Guest.m")
