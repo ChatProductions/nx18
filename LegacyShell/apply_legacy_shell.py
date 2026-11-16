@@ -32,7 +32,7 @@ def apply(legacy: Path, shell: Path) -> dict:
     needed = (main_file, loader, renderer, project,
               shell / "dm/tools/guest_dylib.py",
               shell / f"dm/games/{NEUTRAL}/game.tsv",
-              shell / f"dm/games/{NEUTRAL}/dmsh_chain.h")
+              legacy / "dm/gfx/nvn/legacy/dmsh_chain.h")
     missing = [str(p) for p in needed if not p.is_file()]
     if missing:
         raise RuntimeError("missing upstream file(s): " + ", ".join(missing))
@@ -101,9 +101,13 @@ static char *g_argv[20]; static int g_argc;""",
 
     profile = legacy / "dm/games" / NEUTRAL
     profile.mkdir(parents=True, exist_ok=True)
-    for basename in ("game.tsv", "dmsh_chain.h"):
-        shutil.copyfile(shell / "dm/games" / NEUTRAL / basename,
-                        profile / basename)
+    shutil.copyfile(shell / "dm/games" / NEUTRAL / "game.tsv",
+                    profile / "game.tsv")
+    # Critical: the modern iOS26 shell carries a 000000000000 placeholder
+    # shader-chain header. The legacy Metal3 renderer uses a COMPILED chain
+    # identifier (e.g. c6c6ac82aed1). Never import the iOS26 placeholder.
+    shutil.copyfile(legacy / "dm/gfx/nvn/legacy/dmsh_chain.h",
+                    profile / "dmsh_chain.h")
 
     # Reuse upstream's actual Mach-O generator; change both the on-disk
     # LC_BUILD_VERSION and the plist minimum OS. Its original is iOS26.
