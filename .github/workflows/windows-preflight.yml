@@ -5,7 +5,10 @@ on:
     branches: [main]
     paths:
       - "tools/nso_probe.py"
+      - "tools/rewrite_exefs.py"
       - "tests/test_nso_probe.py"
+      - "tests/test_rewrite_exefs.py"
+      - "scripts/setup-windows.ps1"
       - ".github/workflows/windows-preflight.yml"
   workflow_dispatch:
 
@@ -22,6 +25,8 @@ jobs:
         with:
           python-version: "3.12"
       - name: Verify Switch NSO header parser with synthetic test data
-        run: python -m unittest discover -s tests -p test_nso_probe.py -v
-      - name: Show offline command
-        run: python tools/nso_probe.py --help
+        run: python -m unittest discover -s tests -p "test_*.py" -v
+      - name: Show offline commands
+        run: |
+          python tools/nso_probe.py --help
+          python tools/rewrite_exefs.py --help
