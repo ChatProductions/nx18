@@ -100,8 +100,8 @@ def run_rewrite(exefs: Path, upstream: Path, output: Path, *,
     for module in report["modules"]:
         name = module["filename"]
         inp = (exefs / name).resolve(strict=True)
-        mod_out = output / name
-        mod_out.mkdir(parents=True, exist_ok=True)
+        # Shared output layout matches nxnative's build_ipa.sh: PATCHED/main.fixups.tsv.
+        mod_out = output
         argv = [python, str(rewrite), str(inp), str(mod_out), name]
         print(f"[nx18] rewriting {name} ({module['file_bytes']} bytes)…", flush=True)
         try:
@@ -112,7 +112,7 @@ def run_rewrite(exefs: Path, upstream: Path, output: Path, *,
         products = {}
         for suffix in EXPECTED_FILES:
             p = mod_out / f"{name}.{suffix}"
-            if not p.is_file() or p.stat().st_size == 0:
+            if not p.is_file() or (suffix != "gates.tsv" and p.stat().st_size == 0):
                 raise RuntimeError(f"rewriter did not produce expected {p.name}")
             products[suffix] = {
                 "relative_path": str(p.relative_to(output)),
