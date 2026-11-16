@@ -52,7 +52,12 @@ static char *g_argv[4]; static int g_argc;
         self._write(self.legacy / "dm/gfx/nvn/nvn_mtl.m",
                     '#include "legacy/nvn_mtl_legacy.inc"\n')
         self._write(self.legacy / "dm/gfx/nvn/legacy/nvn_mtl_legacy.inc",
-                    "#ifdef DM_SHELL\nnewLibraryWithSource\n#endif\nstatic uint64_t g_pq_in;\n")
+                    "#ifdef DM_SHELL\nnewLibraryWithSource\n#endif\nstatic uint64_t g_pq_in;\n"
+                    "static int present_encode(id<MTLCommandBuffer> cb, id<MTLTexture> src, id<MTLTexture> dst, const int crop[4]);\n"
+                    + ("""double dw = dst.width, dh = dst.height, s = fmin(dw / cw, dh / ch);
+MTLViewport vp = {floor((dw - cw * s) / 2), floor((dh - ch * s) / 2), round(cw * s), round(ch * s), 0, 1};
+if (fabs((dw / dh) / ((double)cw / ch) - 1) < 0.01) vp = (MTLViewport){0, 0, dw, dh, 0, 1};
+""" * 2))
         self._write(self.legacy / "dm/gfx/nvn/legacy/dmsh_chain.h",
                     '#define DMSH_CHAIN "c6c6ac82aed1"\n')
         self._write(self.legacy / "dm/ios/project.yml",
@@ -100,6 +105,11 @@ static char *g_argv[4]; static int g_argc;
         self.assertIn("*queued = g_pq_in", render)
         self.assertIn("*done = g_pq_done", render)
         self.assertIn("pthread_mutex_lock(&g_pq_mu)", render)
+        self.assertIn("void mtl_present_layer(uint32_t w, uint32_t h)", render)
+        self.assertIn("atomic_store_explicit(&g_nx18_vi_layer_wh", render)
+        self.assertEqual(render.count("nx18_present_aspect(cw, ch"), 2)
+        self.assertEqual(render.count("round(content_w * s)"), 2)
+        self.assertNotIn("round(cw * s)", render)
 
         gamepad = (self.legacy / "dm/ios/Sources/DmGamepad_legacy.inc").read_text()
         self.assertNotIn("g_motion.deviceMotionBody = body", gamepad)
