@@ -37,6 +37,14 @@ struct InspectorSmoke {
         precondition(parsed.entries[0].length == 4)
         precondition(parsed.report.contains("NCA files: 1"))
 
+        let extracted = dir.appendingPathComponent("extracted")
+        let copied = try NSPExtractor.extract(url: sample, index: parsed,
+                                              destination: extracted)
+        precondition(copied == 1)
+        let nca = extracted.appendingPathComponent("0123456789abcdef.nca")
+        let bytes = try Data(contentsOf: nca)
+        precondition(bytes == Data(repeating: 0x72, count: 4))
+
         try fixture(relative: 4, length: 5).write(to: sample)
         do {
             _ = try NSPInspector.inspect(url: sample)
@@ -51,6 +59,6 @@ struct InspectorSmoke {
         } catch NSPInspectionError.truncated {
             // Expected: too short even for the header.
         }
-        print("PASS: valid PFS0, NCA count, bounds rejection and truncated header")
+        print("PASS: PFS0 index, encrypted NCA extraction, bounds rejection and invalid header")
     }
 }
