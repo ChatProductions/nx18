@@ -31,6 +31,8 @@ def unpack_shell(archive: Path, root: Path) -> Path:
         for member in z.infolist():
             name = member.filename
             bits = Path(name).parts
+            if bits == ("Payload",) and member.is_dir():
+                continue
             if (not bits or bits[0] != "Payload" or
                 len(bits) < 2 or bits[1] != "DmIOS.app" or
                 any(b in ("", ".", "..") for b in bits) or
@@ -100,7 +102,7 @@ def package(shell: Path, guest: Path, rewritten: Path,
     if rewrite_manifest.get("title_id") != EXPECTED_TITLE:
         raise ValueError("rewritten modules have a different title ID")
     module_names = {x["name"] for x in rewrite_manifest["modules"]}
-    if "main" not in module_names or not module_names.issubset(
+    if "main" not in module_names or not (module_names - {"rtld"}).issubset(
             set(fields["modules"].split())):
         raise ValueError("guest modules and runtime profile disagree")
     chain = chain_from_header(legacy_chain_header)
@@ -116,6 +118,8 @@ def package(shell: Path, guest: Path, rewritten: Path,
     with tempfile.TemporaryDirectory(prefix="nx18-packing-") as directory:
         root = Path(directory)
         app = unpack_shell(shell, root)
+        if macho_minos(app / "DmIOS", expected_kind=2) != MINOS_17:
+            raise ValueError("game-free app was not compiled for iOS 17")
         if (app / "Frameworks").exists():
             raise ValueError("game-free shell unexpectedly contains frameworks")
         (app / "Frameworks").mkdir()
