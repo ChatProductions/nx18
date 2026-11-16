@@ -32,13 +32,13 @@ def digest(path: Path) -> str:
     return h.hexdigest()
 
 
-def macho_minos(path: Path) -> int:
+def macho_minos(path: Path, expected_kind: int = MH_DYLIB) -> int:
     # Validate only the structural fields needed to reject iOS26 artifacts.
     with path.open("rb") as f:
         header = f.read(32)
         if len(header) != 32: raise ValueError("short Mach-O header")
         magic, cpu, _, kind, cmds, size, _, _ = struct.unpack("<IiiIIIII", header)
-        if magic != 0xFEEDFACF or cpu != ARM64_CPU or kind != MH_DYLIB:
+        if magic != 0xFEEDFACF or cpu != ARM64_CPU or kind != expected_kind:
             raise ValueError("not an iOS arm64 dynamic library")
         if size > 16384 - 32:
             raise ValueError("load commands exceed first 16KiB header page")
