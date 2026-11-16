@@ -53,6 +53,19 @@ def apply(legacy: Path, shell: Path) -> dict:
         raise RuntimeError("expected iOS17 on-device MSL compiler branch is missing")
     if "DM_IOS_DEPLOYMENT_TARGET" not in project.read_text(encoding="utf-8"):
         raise RuntimeError("legacy project cannot be retargeted to iOS17")
+    # GameMenu.swift is used by the modern iOS26 controller frontend only.
+    # The legacy iOS17 DmGamepad_legacy.inc and front_ios_legacy.inc never
+    # call dm_game_menu. Compiling the modern menu forces unsupported
+    # dm_pad_layout_set/dm_quit_menu into the legacy link. Exclude it at
+    # the XcodeGen source-list level rather than adding fake controller APIs.
+    project_text = project.read_text(encoding="utf-8")
+    excludes = "        excludes: [Info.plist]"
+    if project_text.count(excludes) != 1:
+        raise RuntimeError("legacy XcodeGen Sources exclusion changed upstream")
+    project.write_text(
+        project_text.replace(excludes,
+                             "        excludes: [Info.plist, GameMenu.swift]", 1),
+        encoding="utf-8")
 
     original = main_file.read_text(encoding="utf-8")
     if "NX18_SHELL" in original:
