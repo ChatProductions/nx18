@@ -40,7 +40,8 @@ enum NCAHeader {
             guard parts.count == 2 else { continue }
             let name = parts[0].trimmingCharacters(in: .whitespaces).lowercased()
             guard name == "header_key" || name == "nca_header_key" else { continue }
-            let hex = parts[1].split(separator: "#", maxSplits: 1)[0]
+            let hex = String(parts[1].split(separator: "#", maxSplits: 1,
+                                      omittingEmptySubsequences: false).first ?? "")
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             guard hex.count == 64 else { throw Failure.invalidHex }
             let chars = Array(hex.utf8)
