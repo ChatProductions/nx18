@@ -27,7 +27,7 @@ def apply(legacy: Path, shell: Path) -> dict:
     legacy, shell = legacy.resolve(), shell.resolve()
     main_file = legacy / "dm/ios/Sources/main.m"
     loader = legacy / "dm/host/loader_legacy.inc"
-    renderer = legacy / "dm/gfx/nvn/nvn_mtl_legacy.inc"
+    renderer = legacy / "dm/gfx/nvn/legacy/nvn_mtl_legacy.inc"
     project = legacy / "dm/ios/project.yml"
     needed = (main_file, loader, renderer, project,
               shell / "dm/tools/guest_dylib.py",
@@ -39,6 +39,16 @@ def apply(legacy: Path, shell: Path) -> dict:
     if "int dm_set_game_image_header(const void *header)" not in loader.read_text(encoding="utf-8"):
         raise RuntimeError("legacy host is missing its external image setter")
     metal = renderer.read_text(encoding="utf-8")
+    # nvn_mtl.m compiles legacy/nvn_mtl_legacy.inc on iOS, NOT the
+    # similarly named top-level nvn_mtl_legacy.inc copy. Fixes must land
+    # in the compiled source or an ARM64 linker error survives silently.
+    wrapper = legacy / "dm/gfx/nvn/nvn_mtl.m"
+    if not wrapper.is_file():
+        raise RuntimeError("NVN renderer translation unit is missing")
+    nvn_wrapper = wrapper.read_text(encoding="utf-8")
+    if '#include "legacy/nvn_mtl_legacy.inc"' not in nvn_wrapper:
+        raise RuntimeError("legacy Metal3 translation unit changed: inspect compiled include")
+
     if "newLibraryWithSource" not in metal or "#ifdef DM_SHELL" not in metal:
         raise RuntimeError("expected iOS17 on-device MSL compiler branch is missing")
     if "DM_IOS_DEPLOYMENT_TARGET" not in project.read_text(encoding="utf-8"):
