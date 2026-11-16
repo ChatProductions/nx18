@@ -133,6 +133,24 @@ static char *g_argv[20]; static int g_argc;""",
         'Metal26-only setter.')
     vk_source.write_text(vk, encoding="utf-8")
 
+    # iOS26's MetalFX frame interpolator class is absent from Xcode16.4.
+    # These were capability probes only (actual framegen integration pending).
+    # Retain MetalFX spatial/temporal scaling, mark interpolation unsupported.
+    graphics = legacy / "dm/ios/Sources/DmGraphicsCapabilities.h"
+    if not graphics.is_file():
+        raise RuntimeError("legacy MetalFX capability header is missing")
+    cap = graphics.read_text(encoding="utf-8")
+    modern = '''    if (@available(iOS 26.0, *)) {
+        interpolation = [MTLFXFrameInterpolatorDescriptor supportsDevice:device];
+        interpolation4 = [MTLFXFrameInterpolatorDescriptor supportsMetal4FX:device];
+    }'''
+    if cap.count(modern) != 1:
+        raise RuntimeError("iOS26 MetalFX probe was changed upstream")
+    cap = cap.replace(modern,
+        "    // nx18/iOS17: MetalFX frame interpolation is an iOS26 API; "
+        "keep the two capabilities disabled.")
+    graphics.write_text(cap, encoding="utf-8")
+
     main_file.write_text(updated, encoding="utf-8")
     shutil.copyfile(HERE / "NX18Guest.m",
                     legacy / "dm/ios/Sources/NX18Guest.m")
