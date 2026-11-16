@@ -151,6 +151,23 @@ static char *g_argv[20]; static int g_argc;""",
         "keep the two capabilities disabled.")
     graphics.write_text(cap, encoding="utf-8")
 
+    # iOS27 CMMotionManager.deviceMotionBody is unavailable to the iOS18
+    # SDK. On older devices phone_motion_start already maps hardware-frame
+    # sensor readings through interface orientation. Leave that path intact.
+    gamepad = legacy / "dm/ios/Sources/DmGamepad_legacy.inc"
+    if not gamepad.is_file():
+        raise RuntimeError("legacy gamepad motion source is missing")
+    gp = gamepad.read_text(encoding="utf-8")
+    body_line = ('    if (@available(iOS 27.0, *)) { '
+                 'g_motion.deviceMotionBody = body; g_motion_body = YES; '
+                 'LOG("front end: the phone\\'s motion comes in the pad '
+                 'view\\'s frame (deviceMotionBody)"); }')
+    if gp.count(body_line) != 1:
+        raise RuntimeError("iOS27 deviceMotionBody source differs; cannot patch safely")
+    gp = gp.replace(body_line,
+        '    // nx18 iOS17/18: use hardware-frame gyro + orientation mapping.')
+    gamepad.write_text(gp, encoding="utf-8")
+
     main_file.write_text(updated, encoding="utf-8")
     shutil.copyfile(HERE / "NX18Guest.m",
                     legacy / "dm/ios/Sources/NX18Guest.m")
