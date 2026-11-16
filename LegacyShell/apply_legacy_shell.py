@@ -95,6 +95,26 @@ static char *g_argv[20]; static int g_argc;""",
     front_hud_env();'''
     updated = replace_one(updated, profile_anchor, profile_injection,
                           "main.m runtime game profile")
+    # Xcode 16.4 does not know SwiftUI's iOS26 Liquid Glass button style,
+    # even inside #available(iOS 26.0, *). Keep the iOS17-compatible branch
+    # as the sole expression in the @ViewBuilder.
+    launcher = legacy / "dm/ios/Sources/Launcher.swift"
+    if not launcher.is_file():
+        raise RuntimeError("legacy launcher Swift source is missing")
+    swift = launcher.read_text(encoding="utf-8")
+    glass = ('if #available(iOS 26.0, *) { '
+             'button.buttonStyle(.glassProminent) } else { '
+             'button.buttonStyle(.borderedProminent) }')
+    if swift.count(glass) == 1:
+        swift = swift.replace(glass, 'button.buttonStyle(.borderedProminent)')
+        launcher.write_text(swift, encoding="utf-8")
+    elif ".glassProminent" in swift:
+        raise RuntimeError("unhandled SwiftUI iOS26 .glassProminent reference")
+    # A change in upstream SwiftUI sources can add more newer SDK usages.
+    for source in (legacy / "dm/ios/Sources").glob("*.swift"):
+        if ".glassProminent" in source.read_text(encoding="utf-8"):
+            raise RuntimeError("SwiftUI 26 style remains in " + str(source))
+
     main_file.write_text(updated, encoding="utf-8")
     shutil.copyfile(HERE / "NX18Guest.m",
                     legacy / "dm/ios/Sources/NX18Guest.m")
