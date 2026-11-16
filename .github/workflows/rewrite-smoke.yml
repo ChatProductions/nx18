@@ -7,6 +7,7 @@ on:
       - "tools/build_guest18.py"
       - "tools/game_targets.py"
       - "LegacyShell/**"
+      - "tests/smoke_native18_packaging.py"
       - "tools/nso_probe.py"
       - "tests/test_rewrite_exefs.py"
       - "tests/test_nso_probe.py"
@@ -89,6 +90,12 @@ jobs:
           print("PASS: signed native ARM64 guest code container targets iOS17.")
           '@ | python -
           if ($LASTEXITCODE -ne 0) { throw "Guest framework validation failed" }
+      - name: Assemble synthetic Terminator native IPA scaffold (no real game)
+        run: >
+          python tests/smoke_native18_packaging.py
+          --legacy vendor/nxnative
+          --rewritten work/rewrite
+          --native work/native
       - name: Check native output and manifest
         shell: pwsh
         run: |
