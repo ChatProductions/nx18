@@ -9,6 +9,8 @@ on:
       - "tools/game_targets.py"
       - "tools/build_guest18.py"
       - "tools/package_native18.py"
+      - "tools/audit_cached_native.py"
+      - "tests/test_cached_native.py"
       - "tests/test_nso_probe.py"
       - "tests/test_rewrite_exefs.py"
       - "tests/test_game_targets.py"
