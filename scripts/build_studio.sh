@@ -18,6 +18,7 @@ xcrun swiftc -O -parse-as-library -swift-version 5 \
   "$ROOT/Studio/NSPInspector.swift" \
   "$ROOT/Studio/NSPExtractor.swift" \
   "$ROOT/Studio/MetalProbe.swift" \
+  "$ROOT/Studio/NCAHeader.swift" \
   "$ROOT/Studio/NX18App.swift" \
   -o "$APP/NX18Studio"
 
