@@ -21,7 +21,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Test PFS0 inspector on macOS
         run: |
-          swiftc -parse-as-library Studio/NSPInspector.swift Studio/NSPExtractor.swift Tests/InspectorSmoke.swift -o /tmp/nx18-inspector-smoke
+          swiftc -parse-as-library Studio/NSPInspector.swift Studio/NSPExtractor.swift Studio/NCAHeader.swift Tests/InspectorSmoke.swift -o /tmp/nx18-inspector-smoke
           /tmp/nx18-inspector-smoke
       - name: Compile unsigned iOS app
         run: bash scripts/build_studio.sh
