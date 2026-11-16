@@ -115,6 +115,24 @@ static char *g_argv[20]; static int g_argc;""",
         if ".glassProminent" in source.read_text(encoding="utf-8"):
             raise RuntimeError("SwiftUI 26 style remains in " + str(source))
 
+    # Another iOS26-only declaration leaked into the cross-API Vulkan
+    # fallback. The Xcode16.4 Metal SDK does not declare lodBias, even with
+    # a runtime @available guard. On iOS18 the original guard never runs;
+    # dropping this setter preserves the iOS18 behavior (bias unsupported).
+    vk_source = legacy / "dm/gfx/vk/hle_vk.m"
+    if not vk_source.is_file():
+        raise RuntimeError("missing Vulkan compatibility source")
+    vk = vk_source.read_text(encoding="utf-8")
+    bias_line = ('        if (@available(iOS 26.0, tvOS 26.0, macOS 26.0, *)) '
+                 'sd.lodBias = fminf(fmaxf(ci->mipLodBias, -15), 15);'
+                 '   // Metal 26\'s sampler bias; the device reports maxSamplerLodBias 15')
+    if vk.count(bias_line) != 1:
+        raise RuntimeError("cannot safely remove newer-SDK-only sampler LOD bias")
+    vk = vk.replace(bias_line,
+        '        // nx18 iOS17: Metal3 sampler has no lodBias; omit '
+        'Metal26-only setter.')
+    vk_source.write_text(vk, encoding="utf-8")
+
     main_file.write_text(updated, encoding="utf-8")
     shutil.copyfile(HERE / "NX18Guest.m",
                     legacy / "dm/ios/Sources/NX18Guest.m")
