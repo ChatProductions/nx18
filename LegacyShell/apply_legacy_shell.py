@@ -158,10 +158,7 @@ static char *g_argv[20]; static int g_argc;""",
     if not gamepad.is_file():
         raise RuntimeError("legacy gamepad motion source is missing")
     gp = gamepad.read_text(encoding="utf-8")
-    body_line = ('    if (@available(iOS 27.0, *)) { '
-                 'g_motion.deviceMotionBody = body; g_motion_body = YES; '
-                 'LOG("front end: the phone\\'s motion comes in the pad '
-                 'view\\'s frame (deviceMotionBody)"); }')
+    body_line = """    if (@available(iOS 27.0, *)) { g_motion.deviceMotionBody = body; g_motion_body = YES; LOG("front end: the phone's motion comes in the pad view's frame (deviceMotionBody)"); }"""
     if gp.count(body_line) != 1:
         raise RuntimeError("iOS27 deviceMotionBody source differs; cannot patch safely")
     gp = gp.replace(body_line,
