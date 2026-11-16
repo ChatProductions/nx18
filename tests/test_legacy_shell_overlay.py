@@ -30,7 +30,8 @@ static char *g_argv[4]; static int g_argc;
         self._write(self.legacy / "dm/ios/Sources/front_ios_legacy.inc",
                     "// Synthetic legacy UIKit host with no live settings.\n")
         self._write(self.legacy / "dm/ios/Sources/Launcher.swift",
-                    'if #available(iOS 26.0, *) { button.buttonStyle(.glassProminent) } else { button.buttonStyle(.borderedProminent) }\n')
+                    'if #available(iOS 26.0, *) { button.buttonStyle(.glassProminent) } else { button.buttonStyle(.borderedProminent) }\n'
+                    '    gameMenuModel = model   // the in-game menu shows and saves the same choices (GameMenu.swift)\n')
         # The real upstream tree has dm/tools; the synthetic test fixture must too.
         (self.legacy / "dm/tools").mkdir(parents=True, exist_ok=True)
         self._write(self.legacy / "dm/host/hle_jit.c",
@@ -104,6 +105,7 @@ if (fabs((dw / dh) / ((double)cw / ch) - 1) < 0.01) vp = (MTLViewport){0, 0, dw,
         launcher = (self.legacy / "dm/ios/Sources/Launcher.swift").read_text()
         self.assertIn("button.buttonStyle(.borderedProminent)", launcher)
         self.assertNotIn(".glassProminent", launcher)
+        self.assertNotIn("gameMenuModel = model", launcher)
         metal3vk = (self.legacy / "dm/gfx/vk/hle_vk.m").read_text()
         self.assertNotIn("sd.lodBias", metal3vk)
         caps = (self.legacy / "dm/ios/Sources/DmGraphicsCapabilities.h").read_text()
