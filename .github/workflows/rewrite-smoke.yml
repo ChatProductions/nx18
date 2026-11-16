@@ -1,0 +1,86 @@
+name: Real native NSO rewrite smoke test (Windows)
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tools/rewrite_exefs.py"
+      - "tools/nso_probe.py"
+      - "tests/test_rewrite_exefs.py"
+      - "tests/test_nso_probe.py"
+      - ".github/workflows/rewrite-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  upstream-native-rewrite:
+    name: Run actual nxnative rewriter on synthetic ARM64 NSO
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install rewriter dependencies (no Apple tools)
+        run: python -m pip install "capstone>=5,<6" "lz4>=4,<5"
+      - name: Clone legacy native renderer/rewriter
+        shell: pwsh
+        run: |
+          git clone --filter=blob:none --depth 1 --branch ios16-ios17-compat https://github.com/widmonstertony/nxnative.git vendor/nxnative
+          if ($LASTEXITCODE -ne 0) { throw "Failed to clone legacy nxnative fork" }
+          git -C vendor/nxnative rev-parse HEAD
+      - name: Generate non-copyrighted synthetic Switch ARM64 module
+        shell: pwsh
+        run: |
+          @'
+          from pathlib import Path
+          import struct
+          target = Path("work") / "synthetic" / "exefs"
+          target.mkdir(parents=True, exist_ok=True)
+          header = bytearray(0x100)
+          header[:4] = b"NSO0"
+          # Three 0x1000-byte uncompressed segments, aligned guest memory.
+          for i in range(3):
+              struct.pack_into("<III", header, 0x10 + i * 16,
+                               0x100 + i * 0x1000, i * 0x1000, 0x1000)
+          # Host-independent ARM64 NOP sequence ending in RET; synthetic only.
+          text = b"\x1f\x20\x03\xd5" * 1023 + b"\xc0\x03\x5f\xd6"
+          (target / "main").write_bytes(
+              header + text + bytes(0x1000) + bytes(0x1000)
+          )
+          print("Fixture:", target / "main")
+          '@ | python -
+          if ($LASTEXITCODE -ne 0) { throw "Fixture generation failed" }
+      - name: Run production nx18 wrapper against REAL nxnative rewriter
+        run: >
+          python tools/rewrite_exefs.py
+          work/synthetic/exefs
+          --upstream vendor/nxnative
+          --output work/rewrite
+          --title-id 0100670014482000
+          --jobs 2
+      - name: Check native output and manifest
+        shell: pwsh
+        run: |
+          @'
+          from pathlib import Path
+          import json
+          out = Path("work/rewrite")
+          manifest = json.loads((out / "rewrite-manifest.json").read_text())
+          assert manifest["modules"][0]["name"] == "main"
+          assert manifest["source_revision"]
+          assert manifest["host_or_ipa_built"] is False
+          assert (out / "main.patched.bin").stat().st_size > 0
+          assert (out / "main.fixups.tsv").stat().st_size > 0
+          print("PASS: real rewriter generated a native image and fixup data.")
+          '@ | python -
+          if ($LASTEXITCODE -ne 0) { throw "Rewrite audit failed" }
+      - name: Publish synthetic rewrite manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nx18-native-rewrite-smoke-report
+          path: work/rewrite/rewrite-manifest.json
+          if-no-files-found: ignore
