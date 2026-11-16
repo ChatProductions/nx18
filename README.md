@@ -4,18 +4,36 @@
 
 ## Development track: native Metal 3 host and signed game code
 
-The project has moved beyond a standalone inspection app. The active codepath is:
+The project has moved beyond a standalone inspection app. The active codepath is **game-agnostic**, with title-specific profiles for compatibility:
 
 - **iOS 17/18 game-free native host**: [LegacyShell](LegacyShell/) backports signed `Guest.framework` loading into the established Metal 3 nxnative runtime, preserving its older iOS deployment target.
 - **Windows native ARM64 rewriting**: [rewrite_exefs.py](tools/rewrite_exefs.py) uses the real existing NSO rewriter; it does not emulate a Switch CPU.
 - **iOS 17 signed-code framework**: [build_guest18.py](tools/build_guest18.py) turns rewritten ARM64 modules into the Mach-O `Guest.framework` consumed by the legacy host.
-- **Game-specific runtime settings**: the shell loads `dm/profile.tsv` so the AC2 program ID, memory layout, RomFS marker, and service parameters do not inherit the shell placeholder.
+- **Game-specific runtime settings**: the shell loads `dm/profile.tsv` so the selected game's program ID, memory layout, RomFS marker and service parameters do not inherit the shell placeholder.
 - **Offline package assembly**: [package_native18.py](tools/package_native18.py) stages the host, rewritten modules, compatible legacy shader resources, profile and RomFS into an unsigned IPA. The final game IPA still needs signing.
 - **CI host compilation**: [shell18.yml](.github/workflows/shell18.yml) builds the actual native Metal 3 host using a GitHub-hosted Xcode 16.4 runner, not the user's Windows PC.
 
-**Verification boundary:** these are committed integration sources. Successful host compilation, the exact AC2 shader chain, a signed installable game and iPhone 13 gameplay have **not** been confirmed. An unsigned shell or package assembled without matching shaders is not playable.
+**Verification boundary:** these are committed integration sources. Successful host compilation, a compatible per-game shader chain, a signed installable game and iPhone 13 gameplay have **not** been confirmed. An unsigned shell or package assembled without matching shaders is not playable.
 
 [Engineering state and exact steps](docs/native18_pipeline.md)
+
+## First-game test priorities (storage-sensitive)
+
+| Priority | Switch game | Base title ID | Reason |
+| --- | --- | --- | --- |
+| **Now** | Terminator 2D: NO FATE | `0100B51020B68000` | Small first real-game target (~692 MB Switch download), prior ns2ios-shell Windows attempt; no huge AC2 transfer needed |
+| **Fallback** | Need for Speed: Hot Pursuit Remastered | `010029B0118E8000` | Existing nxnative compatibility research, but a large ~8.1 GB download and A15 viability unproven |
+| **Later** | Assassin's Creed II / The Ezio Collection | `0100670014482000` | Intended end goal; transfer deferred until storage is available |
+
+Choose any registered game or a custom 16-digit Switch title ID:
+
+```powershell
+python tools/game_targets.py --list
+python tools/rewrite_exefs.py "C:\Switch\Terminator\ExeFS" --upstream vendor/nxnative --output work/terminator-rewrite --title-id 0100B51020B68000
+python tools/build_guest18.py --rewritten work/terminator-rewrite --legacy vendor/nxnative --out work/terminator-guest --target terminator
+```
+
+The code is generic but **no game has been verified playable on iPhone 13**. Existing game-specific shader/Horizon patches still matter. No proprietary game files or keys should be committed or uploaded to Actions.
 
 ## What exists today
 
