@@ -165,6 +165,35 @@ static char *g_argv[20]; static int g_argc;""",
         '    // nx18 iOS17/18: use hardware-frame gyro + orientation mapping.')
     gamepad.write_text(gp, encoding="utf-8")
 
+    # The modern HLE JIT service calls nro_unload_alone(), a standalone NRO
+    # lifecycle method absent from the legacy loader. iOS cannot execute
+    # dynamically generated guest code and CreateJitEnvironment already dies
+    # before loading such a plugin. On iOS18 explicitly reject the impossible
+    # teardown path; preserve the original logic on other platforms.
+    jit = legacy / "dm/host/hle_jit.c"
+    if not jit.is_file():
+        raise RuntimeError("legacy JIT service source is missing")
+    src = jit.read_text(encoding="utf-8")
+    old_unload = '''    if (e->plugin) {
+        if (e->plugin->fini) ((void (*)(void))(e->plugin->base + e->plugin->fini))();
+        nro_unload_alone(e->plugin);   // the loader's: under its locks, with its check of stacks borrowing the plugin's data
+        munmap((void *)e->rx, e->rx_size);
+    }   // a served image stays mapped in the layout'''
+    new_unload = '''#if TARGET_OS_IPHONE
+    // A JIT plugin could never have loaded: iOS CreateJitEnvironment refuses it.
+    if (e->plugin) die("nx18 iOS legacy loader cannot unload JIT NRO plugins");
+#else
+    if (e->plugin) {
+        if (e->plugin->fini) ((void (*)(void))(e->plugin->base + e->plugin->fini))();
+        nro_unload_alone(e->plugin);
+        munmap((void *)e->rx, e->rx_size);
+    }
+#endif
+    // A served image stays mapped in the native image layout.'''
+    if src.count(old_unload) != 1:
+        raise RuntimeError("legacy JIT service teardown changed upstream")
+    jit.write_text(src.replace(old_unload, new_unload), encoding="utf-8")
+
     main_file.write_text(updated, encoding="utf-8")
     shutil.copyfile(HERE / "NX18Guest.m",
                     legacy / "dm/ios/Sources/NX18Guest.m")
