@@ -77,7 +77,8 @@ struct InspectorSmoke {
         let decrypted = try NCAHeader.cryptHeader(encrypted, headerKey: key, encrypt: false)
         precondition(decrypted == plain)
         let keyText = "header_key = " + key.map { String(format: "%02x", $0) }.joined()
-        precondition(try NCAHeader.headerKey(from: keyText) == key)
+        let parsedKey = try NCAHeader.headerKey(from: keyText)
+        precondition(parsedKey == key)
 
         let ncaName = Data("0123456789abcdef.nca\0".utf8)
         var nsp = fixture(length: 0x400, fileSize: 0x400)
