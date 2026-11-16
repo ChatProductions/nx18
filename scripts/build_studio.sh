@@ -26,6 +26,14 @@ cp "$ROOT/Studio/Info.plist" "$APP/Info.plist"
 plutil -lint "$APP/Info.plist"
 /usr/libexec/PlistBuddy -c 'Print :MinimumOSVersion' "$APP/Info.plist" | grep -Fx '17.0'
 file "$APP/NX18Studio"
+# Fail if the Mac compiler accidentally moves the minimum iOS version to 26.
+xcrun vtool -show-build "$APP/NX18Studio" | tee "$OUT/macho-build-version.txt"
+grep -Eq "minos[[:space:]]+17[.]0" "$OUT/macho-build-version.txt" || {
+  echo "Unexpected Mach-O deployment target"; exit 1;
+}
+if otool -L "$APP/NX18Studio" | grep -q "libswift_DarwinFoundation2"; then
+  echo "ERROR: iOS 26 Swift runtime dependency detected"; exit 1
+fi
 
 (
   cd "$OUT"
