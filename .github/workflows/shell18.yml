@@ -15,7 +15,8 @@ permissions:
 
 jobs:
   native-shell:
-    runs-on: macos-15
+    # Intel is an alternative capacity pool; Xcode still targets arm64-apple-ios.
+    runs-on: macos-15-intel
     timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
