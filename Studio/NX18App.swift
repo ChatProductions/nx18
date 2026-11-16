@@ -20,6 +20,7 @@ struct StudioView: View {
     @State private var report = ""
     @State private var inspectedURL: URL?
     @State private var inspectedIndex: NSPIndex?
+    @State private var metalStatus = "Not tested on this device."
 
     var body: some View {
         NavigationStack {
@@ -86,6 +87,20 @@ struct StudioView: View {
                         ShareLink(item: report) {
                             Label("Share diagnostic report", systemImage: "square.and.arrow.up")
                         }
+                    }
+
+                    GroupBox("Metal 3 runtime check") {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Button("Compile and render Metal shader on-device") {
+                                probeMetal()
+                            }
+                            .buttonStyle(.bordered)
+                            .disabled(busy)
+                            Text(metalStatus)
+                                .font(.footnote)
+                                .textSelection(.enabled)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
 
                     GroupBox("Porting status") {
@@ -172,4 +187,24 @@ struct StudioView: View {
             }
         }
     }
+
+    private func probeMetal() {
+        busy = true
+        metalStatus = "Compiling MSL on this iPhone…"
+        Task.detached(priority: .userInitiated) {
+            do {
+                let result = try MetalProbe.run()
+                await MainActor.run {
+                    metalStatus = result
+                    busy = false
+                }
+            } catch {
+                await MainActor.run {
+                    metalStatus = "FAIL: " + error.localizedDescription
+                    busy = false
+                }
+            }
+        }
+    }
+
 }
