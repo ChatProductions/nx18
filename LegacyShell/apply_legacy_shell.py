@@ -36,6 +36,10 @@ def apply(legacy: Path, shell: Path) -> dict:
     missing = [str(p) for p in needed if not p.is_file()]
     if missing:
         raise RuntimeError("missing upstream file(s): " + ", ".join(missing))
+    # Fail before touching the XcodeGen project or any upstream file.
+    # A second overlay application must not partially mutate a source tree.
+    if "NX18_SHELL" in main_file.read_text(encoding="utf-8"):
+        raise RuntimeError("already patched; use a fresh legacy checkout")
     if "int dm_set_game_image_header(const void *header)" not in loader.read_text(encoding="utf-8"):
         raise RuntimeError("legacy host is missing its external image setter")
     metal = renderer.read_text(encoding="utf-8")
