@@ -50,7 +50,7 @@ static char *g_argv[4]; static int g_argc;
                     'else LOG("DM_CTL: bufsnap <shader key> <hex address> <bytes> <path>"); continue; }\n')
         self._write(self.legacy / "dm/host/loader_legacy.inc",
                     "int dm_set_game_image_header(const void *header) { return 1; }\n"
-                    "int dm_main_imports(const char *prefix) { return 0; }\n")
+                    "int dm_main_imports(const char *prefix) {\n    return 0;\n}\n")
         self._write(self.legacy / "dm/host/hle_lifecycle.c",
                     "#include <unistd.h>\n")
         self._write(self.legacy / "dm/ios/Sources/DmGraphicsCapabilities.h",
@@ -185,7 +185,9 @@ if (fabs((dw / dh) / ((double)cw / ch) - 1) < 0.01) vp = (MTLViewport){0, 0, dw,
 
     def test_reject_unrecognized_import_scanner(self):
         loader = self.legacy / "dm/host/loader_legacy.inc"
-        loader.write_text("legacy imports API moved\n")
+        loader.write_text(loader.read_text().replace(
+            "int dm_main_imports(const char *prefix) {",
+            "int renamed_main_imports(const char *prefix) {"))
         with self.assertRaisesRegex(RuntimeError, "main-import symbol scanner"):
             apply(self.legacy, self.shell)
 
