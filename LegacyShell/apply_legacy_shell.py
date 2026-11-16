@@ -77,6 +77,24 @@ static char *g_argv[20]; static int g_argc;""",
     dm_host_preload_start(g_argc, g_argv);''',
         "main.m native preload",
     )
+    # The legacy host already has a runtime game profile (DM_PROFILE), so
+    # preserve each game's real memory layout, title ID and RomFS marker
+    # instead of hardcoding the neutral shell profile.
+    profile_anchor = '    front_hud_env();'
+    profile_injection = '''#ifdef NX18_SHELL
+    // A user's game-profile TSV is carried in the signed app's dm folder.
+    // Set it BEFORE the first dm_profile() call and before guest relocation.
+    NSString *nx18_profile = [res stringByAppendingPathComponent:@"dm/profile.tsv"];
+    if ([fm fileExistsAtPath:nx18_profile]) {
+        setenv("DM_PROFILE", nx18_profile.fileSystemRepresentation, 1);
+        fprintf(stderr, "nx18: per-game runtime profile loaded from dm/profile.tsv\\n");
+    } else {
+        fprintf(stderr, "nx18: no runtime game profile installed yet\\n");
+    }
+#endif
+    front_hud_env();'''
+    updated = replace_one(updated, profile_anchor, profile_injection,
+                          "main.m runtime game profile")
     main_file.write_text(updated, encoding="utf-8")
     shutil.copyfile(HERE / "NX18Guest.m",
                     legacy / "dm/ios/Sources/NX18Guest.m")
