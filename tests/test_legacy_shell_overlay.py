@@ -25,6 +25,8 @@ static char *g_argv[4]; static int g_argc;
     g_argv[0] = strdup("dmhost"); g_argv[1] = strdup(dm.fileSystemRepresentation); g_argc = 2;
     dm_host_preload_start(g_argc, g_argv);
 ''')
+        self._write(self.legacy / "dm/ios/Sources/Launcher.swift",
+                    'if #available(iOS 26.0, *) { button.buttonStyle(.glassProminent) } else { button.buttonStyle(.borderedProminent) }\n')
         self._write(self.legacy / "dm/host/loader_legacy.inc",
                     "int dm_set_game_image_header(const void *header) { return 1; }\n")
         self._write(self.legacy / "dm/gfx/nvn/nvn_mtl_legacy.inc",
@@ -64,6 +66,10 @@ static char *g_argv[4]; static int g_argc;
         self.assertIn('<string>17.0</string>', guest)
         self.assertNotIn('26.0', guest)
         self.assertTrue((self.legacy / "dm/ios/Sources/NX18Guest.m").exists())
+        launcher = (self.legacy / "dm/ios/Sources/Launcher.swift").read_text()
+        self.assertIn("button.buttonStyle(.borderedProminent)", launcher)
+        self.assertNotIn(".glassProminent", launcher)
+
 
     def test_fail_closed_on_new_unrecognized_upstream(self):
         self.main.write_text("new API; source anchors changed\n")
