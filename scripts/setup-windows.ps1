@@ -25,6 +25,16 @@ if (-not (Test-Path (Join-Path $Vendor "dm\tools\patch_nso.py"))) {
 $sha = git -C $Vendor rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw "Cannot read upstream revision" }
 Write-Host "Native legacy renderer/rewrite checkout: $sha"
+$ShellVendor = "vendor\ns2ios-shell"
+if (-not (Test-Path (Join-Path $ShellVendor "dm\tools\guest_dylib.py"))) {
+    git clone --depth 1 --branch main https://github.com/xinerqu/ns2ios-shell.git $ShellVendor
+    if ($LASTEXITCODE -ne 0) { throw "Cannot fetch reusable native Guest framework builder" }
+}
+if (-not (Test-Path (Join-Path $Vendor "dm\ios\Sources\NX18Guest.m"))) {
+    python .\LegacyShell\apply_legacy_shell.py --legacy $Vendor --shell $ShellVendor
+    if ($LASTEXITCODE -ne 0) { throw "iOS17 native Guest bridge integration failed" }
+}
+
 if (-not $SkipPip) {
     python -m pip install "capstone>=5,<6" "lz4>=4,<5"
     if ($LASTEXITCODE -ne 0) { throw "Python package installation failed" }
@@ -32,4 +42,5 @@ if (-not $SkipPip) {
 python -m unittest discover -s tests -p "test_*exefs.py" -v
 if ($LASTEXITCODE -ne 0) { throw "Wrapper tests failed" }
 Write-Host "Ready. Next: python tools/rewrite_exefs.py EXEFS --upstream $Vendor"
-Write-Host "Generated rewritten modules are NOT a playable IPA."
+Write-Host "After rewriting: python tools/build_guest18.py --rewritten work/rewrite --legacy $Vendor --out work/native"
+Write-Host "A native Guest.framework is not by itself a playable IPA."
