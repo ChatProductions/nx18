@@ -6,8 +6,13 @@ on:
     paths:
       - "tools/nso_probe.py"
       - "tools/rewrite_exefs.py"
+      - "tools/game_targets.py"
+      - "tools/build_guest18.py"
+      - "tools/package_native18.py"
       - "tests/test_nso_probe.py"
       - "tests/test_rewrite_exefs.py"
+      - "tests/test_game_targets.py"
+      - "tests/test_title_binding.py"
       - "scripts/setup-windows.ps1"
       - ".github/workflows/windows-preflight.yml"
   workflow_dispatch:
