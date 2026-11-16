@@ -13,6 +13,9 @@ on:
       - "tests/test_rewrite_exefs.py"
       - "tests/test_game_targets.py"
       - "tests/test_title_binding.py"
+      - "tests/test_legacy_shell_overlay.py"
+      - "LegacyShell/apply_legacy_shell.py"
+      - "LegacyShell/NX18Guest.m"
       - "scripts/setup-windows.ps1"
       - ".github/workflows/windows-preflight.yml"
   workflow_dispatch:
