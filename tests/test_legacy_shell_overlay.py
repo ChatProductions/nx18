@@ -29,6 +29,13 @@ static char *g_argv[4]; static int g_argc;
                     'if #available(iOS 26.0, *) { button.buttonStyle(.glassProminent) } else { button.buttonStyle(.borderedProminent) }\n')
         # The real upstream tree has dm/tools; the synthetic test fixture must too.
         (self.legacy / "dm/tools").mkdir(parents=True, exist_ok=True)
+        self._write(self.legacy / "dm/host/hle_jit.c",
+                    """    if (e->plugin) {
+        if (e->plugin->fini) ((void (*)(void))(e->plugin->base + e->plugin->fini))();
+        nro_unload_alone(e->plugin);   // the loader's: under its locks, with its check of stacks borrowing the plugin's data
+        munmap((void *)e->rx, e->rx_size);
+    }   // a served image stays mapped in the layout
+""")
         self._write(self.legacy / "dm/host/loader_legacy.inc",
                     "int dm_set_game_image_header(const void *header) { return 1; }\n")
         self._write(self.legacy / "dm/ios/Sources/DmGraphicsCapabilities.h",
@@ -88,6 +95,12 @@ static char *g_argv[4]; static int g_argc;
         self.assertNotIn("MTLFXFrameInterpolatorDescriptor", caps)
         gamepad = (self.legacy / "dm/ios/Sources/DmGamepad_legacy.inc").read_text()
         self.assertNotIn("g_motion.deviceMotionBody = body", gamepad)
+        jit = (self.legacy / "dm/host/hle_jit.c").read_text()
+        self.assertIn("#if TARGET_OS_IPHONE", jit)
+        self.assertIn("cannot unload JIT NRO plugins", jit)
+        self.assertIn("#else", jit)
+        self.assertIn("nro_unload_alone(e->plugin)", jit)
+
 
 
 
