@@ -445,6 +445,61 @@ bool dm_setting_live(const char *env, const char *value) {
 """
     legacy_front.write_text(front, encoding="utf-8")
 
+    # A game-free IPA has no RomFS and no signed Guest.framework yet. Offer
+    # the existing, tested Swift NSP importer instead of the legacy error.
+    # Only the missing-game path is redirected; a completed native game IPA
+    # continues through the normal Metal3 game frontend.
+    frontend = legacy / "dm/ios/Sources/front_ios_legacy.inc"
+    source = frontend.read_text(encoding="utf-8")
+    source = replace_one(source,
+        "const char *front_ios_boot_message(void);",
+        """const char *front_ios_boot_message(void);
+#ifdef NX18_SHELL
+void nx18_show_nsp_studio(void *view_controller);
+#endif""", "native iOS NSP bridge")
+    source = replace_one(source,
+        "    front_ios_power_watch();\n    if (!front_ios_boot_ok()) {",
+        """#ifdef NX18_SHELL
+    if (!front_ios_boot_ok()) return;  // on-device NSP picker comes in viewDidAppear
+#endif
+    front_ios_power_watch();
+    if (!front_ios_boot_ok()) {""", "native iOS no-RomFS startup")
+    source = replace_one(source,
+        "    if (!front_ios_boot_ok() && front_ios_boot_message() && !self.presentedViewController) {",
+        """#ifdef NX18_SHELL
+    if (!front_ios_boot_ok()) {
+        if (!self.launched) {
+            self.launched = YES;
+            nx18_show_nsp_studio((__bridge void *)self);
+        }
+        return;
+    }
+#endif
+    if (!front_ios_boot_ok() && front_ios_boot_message() && !self.presentedViewController) {""",
+        "native iOS NSP picker presentation")
+    frontend.write_text(source, encoding="utf-8")
+
+    # The Studio importer already handles fileImporter, PFS0 indexing and
+    # optional in-memory header-key scan. Reuse it without a second @main:
+    # the legacy host's UIApplicationMain remains the only entry point.
+    studio = HERE.parent / "Studio"
+    studio_entry = (studio / "NX18App.swift").read_text(encoding="utf-8")
+    view_anchor = "struct StudioView: View {"
+    if studio_entry.count(view_anchor) != 1 or studio_entry.count("@main") != 1:
+        raise RuntimeError("Studio entrypoint changed; cannot embed inspector safely")
+    sources = legacy / "dm/ios/Sources"
+    (sources / "NX18StudioView.swift").write_text(
+        "import SwiftUI\nimport Foundation\nimport UniformTypeIdentifiers\n\n" +
+        studio_entry[studio_entry.index(view_anchor):], encoding="utf-8")
+    for filename in ("NSPInspector.swift", "NSPExtractor.swift",
+                     "NCAHeader.swift", "MetalProbe.swift"):
+        shutil.copyfile(studio / filename, sources / ("NX18" + filename))
+    shutil.copyfile(HERE.parent / "Runtime/BCDecode.swift",
+                    sources / "NX18BCDecode.swift")
+    shutil.copyfile(HERE / "NX18Import.swift",
+                    sources / "NX18Import.swift")
+
+
     # Modern GameMenu's Quit item relies on the modern UIKit quit-prompt
     # state machine (dm_quit_menu), absent from front_ios_legacy.inc.
     # Do not fake it with exit(0) and risk discarding the game's save data.

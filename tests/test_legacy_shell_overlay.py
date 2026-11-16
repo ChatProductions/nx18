@@ -28,7 +28,20 @@ static char *g_argv[4]; static int g_argc;
         self._write(self.legacy / "dm/ios/Sources/GameMenu.swift",
                     "items.append(Unmanaged<UIMenu>.fromOpaque(dm_quit_menu()).takeRetainedValue())\n")
         self._write(self.legacy / "dm/ios/Sources/front_ios_legacy.inc",
-                    "// Synthetic legacy UIKit host with no live settings.\n")
+                    """const char *front_ios_boot_message(void);
+- (void)viewDidLoad {
+    front_ios_power_watch();
+    if (!front_ios_boot_ok()) {   // No game files: show a hint and do not start the host
+        return;
+    }
+}
+- (void)viewDidAppear:(BOOL)a {
+    [super viewDidAppear:a];
+    if (!front_ios_boot_ok() && front_ios_boot_message() && !self.presentedViewController) {
+        return;
+    }
+}
+""")
         self._write(self.legacy / "dm/ios/Sources/Launcher.swift",
                     'if #available(iOS 26.0, *) { button.buttonStyle(.glassProminent) } else { button.buttonStyle(.borderedProminent) }\n'
                     '    gameMenuModel = model   // the in-game menu shows and saves the same choices (GameMenu.swift)\n')
@@ -128,6 +141,17 @@ if (fabs((dw / dh) / ((double)cw / ch) - 1) < 0.01) vp = (MTLViewport){0, 0, dw,
         legacy_front = (self.legacy / "dm/ios/Sources/front_ios_legacy.inc").read_text()
         self.assertIn("bool dm_setting_live(const char *env, const char *value)", legacy_front)
         self.assertIn("return false;", legacy_front)
+        self.assertIn("nx18_show_nsp_studio((__bridge void *)self)", legacy_front)
+        self.assertIn("if (!front_ios_boot_ok()) return;", legacy_front)
+        sources = self.legacy / "dm/ios/Sources"
+        view = (sources / "NX18StudioView.swift").read_text()
+        self.assertIn("struct StudioView: View", view)
+        self.assertNotIn("@main", view)
+        self.assertIn("NSPInspector.inspect(url:", view)
+        for filename in ("NX18Import.swift", "NX18NSPInspector.swift",
+                         "NX18NSPExtractor.swift", "NX18NCAHeader.swift",
+                         "NX18MetalProbe.swift", "NX18BCDecode.swift"):
+            self.assertTrue((sources / filename).is_file(), filename)
         menu = (self.legacy / "dm/ios/Sources/GameMenu.swift").read_text()
         self.assertNotIn("dm_quit_menu()", menu)
         self.assertIn("modern quit prompt absent", menu)
