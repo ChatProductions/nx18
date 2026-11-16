@@ -5,6 +5,7 @@ on:
     paths:
       - "Studio/**"
       - "Tests/**"
+      - "Runtime/**"
       - "scripts/build_studio.sh"
       - ".github/workflows/ios-studio.yml"
   workflow_dispatch:
@@ -28,6 +29,10 @@ jobs:
         run: |
           swiftc -parse-as-library Studio/NSPInspector.swift Studio/NSPExtractor.swift Studio/NCAHeader.swift Tests/InspectorSmoke.swift -o /tmp/nx18-inspector-smoke
           /tmp/nx18-inspector-smoke
+      - name: Test CPU BC1/BC3 fallback
+        run: |
+          swiftc -parse-as-library Runtime/BCDecode.swift Tests/BCSmoke.swift -o /tmp/nx18-bc-smoke
+          /tmp/nx18-bc-smoke
       - name: Compile unsigned iOS app
         run: bash scripts/build_studio.sh
       - name: Upload unsigned IPA
