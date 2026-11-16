@@ -8,10 +8,11 @@
 - A **real, bounds-checked PFS0/NSP indexer and streaming extractor** on-device. It reads the container and can copy encrypted NCA/ticket files locally without uploading keys, ROMs or account information.
 - **Local `prod.keys` import** to AES-XTS-decode **only NCA headers**, identify the actual Switch ProgramId, and compare it to the Ezio Collection title ID. Keys are kept in session memory, never committed or shared; game content remains encrypted.
 - An on-device **Metal Shading Language compiler + render-pass probe**: uses the iPhone GPU to compile an original triangle shader and submit a completed offscreen draw, **without Metal Developer Tools for Windows**. This tests the technique, not Switch graphics.
-- A Linux/macOS smoke test for the indexer.
+- A pure Swift **BC1 and BC3 to RGBA8 decoder** intended as an A15 GPU texture-format fallback, with edge-block and alpha tests. It is not yet wired into the NVN renderer.
+- A macOS smoke test for the indexer, NCA header cryptography and texture decoding.
 - A CI audit of a real **Metal 3 / iOS 16.1** nxnative derivative to anchor the legacy runtime work.
 
-**Important: This is not yet a playable AC2 IPA or a full NSP converter.** The NCA decryption/update layering, executable static rewriting, guest service layer, prelinked game binary, BC texture fallback, Metal 3 shader conversion, and final IPA assembly are outstanding. The Studio deliberately does not offer a fake "Play" or "Convert" button. Game code must be linked into a signed iOS-compatible Mach-O before executing; putting an NSP inside an IPA does not port it.
+**Important: This is not yet a playable AC2 IPA or a full NSP converter.** The NCA decryption/update layering, executable static rewriting, guest service layer, prelinked game binary, NVN integration for BC texture fallback, Metal 3 shader conversion, and final IPA assembly are outstanding. The Studio deliberately does not offer a fake "Play" or "Convert" button. Game code must be linked into a signed iOS-compatible Mach-O before executing; putting an NSP inside an IPA does not port it.
 
 ## Desired end-to-end pipeline
 
