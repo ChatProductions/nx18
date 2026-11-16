@@ -222,6 +222,55 @@ void mtl_present_progress(uint64_t *queued, uint64_t *done) {
     renderer.write_text(mtl.replace(progress_anchor, progress, 1),
                         encoding="utf-8")
 
+    # Newer nn::vi::CreateLayer(width,height) calls mtl_present_layer().
+    # The iOS17 Metal3 renderer did not export it. Record the requested VI
+    # layer aspect and apply it in BOTH present encoders; preserve the texture
+    # crop and UVs, which are already correct for the original swapchain.
+    # An uninitialized size retains the old texture-based aspect behavior.
+    mtl = renderer.read_text(encoding="utf-8")
+    layer_anchor = ("static int present_encode(id<MTLCommandBuffer> cb, "
+                    "id<MTLTexture> src, id<MTLTexture> dst, const int crop[4]);")
+    layer_bridge = """static _Atomic uint64_t g_nx18_vi_layer_wh;
+void mtl_present_layer(uint32_t w, uint32_t h) {
+    if (!w || !h || w >= 0x10000 || h >= 0x10000) return;
+    atomic_store_explicit(&g_nx18_vi_layer_wh,
+                          ((uint64_t)w << 32) | h, memory_order_release);
+}
+// The VI layer dictates display aspect; the game's swapchain texture still
+// dictates the sampling rectangle, crop and UV coordinates.
+static void nx18_present_aspect(NSUInteger texture_w, NSUInteger texture_h,
+                                double *content_w, double *content_h) {
+    uint64_t wh = atomic_load_explicit(&g_nx18_vi_layer_wh, memory_order_acquire);
+    *content_w = wh ? (double)(wh >> 32) : (double)texture_w;
+    *content_h = wh ? (double)(wh & 0xffffffffu) : (double)texture_h;
+}
+static int present_encode(id<MTLCommandBuffer> cb, id<MTLTexture> src, id<MTLTexture> dst, const int crop[4]);"""
+    if mtl.count(layer_anchor) != 1 or "void mtl_present_layer(" in mtl:
+        raise RuntimeError("legacy Metal3 layer-size ABI changed upstream")
+    mtl = mtl.replace(layer_anchor, layer_bridge, 1)
+    aspect_calc = "double dw = dst.width, dh = dst.height, s = fmin(dw / cw, dh / ch);"
+    if mtl.count(aspect_calc) != 2:
+        raise RuntimeError("expected two legacy present-viewport calculations")
+    mtl = mtl.replace(aspect_calc,
+        "double dw = dst.width, dh = dst.height, content_w, content_h;\n"
+        "    nx18_present_aspect(cw, ch, &content_w, &content_h);\n"
+        "    double s = fmin(dw / content_w, dh / content_h);")
+    orig_viewport = ("MTLViewport vp = {floor((dw - cw * s) / 2), "
+                     "floor((dh - ch * s) / 2), round(cw * s), "
+                     "round(ch * s), 0, 1};")
+    new_viewport = ("MTLViewport vp = {floor((dw - content_w * s) / 2), "
+                    "floor((dh - content_h * s) / 2), round(content_w * s), "
+                    "round(content_h * s), 0, 1};")
+    orig_fill = ("if (fabs((dw / dh) / ((double)cw / ch) - 1) < 0.01) "
+                 "vp = (MTLViewport){0, 0, dw, dh, 0, 1};")
+    new_fill = ("if (fabs((dw / dh) / (content_w / content_h) - 1) < 0.01) "
+                "vp = (MTLViewport){0, 0, dw, dh, 0, 1};")
+    if mtl.count(orig_viewport) != 2 or mtl.count(orig_fill) != 2:
+        raise RuntimeError("legacy viewport ABI changed; refusing partial layer backport")
+    mtl = mtl.replace(orig_viewport, new_viewport)
+    mtl = mtl.replace(orig_fill, new_fill)
+    renderer.write_text(mtl, encoding="utf-8")
+
     main_file.write_text(updated, encoding="utf-8")
     shutil.copyfile(HERE / "NX18Guest.m",
                     legacy / "dm/ios/Sources/NX18Guest.m")
