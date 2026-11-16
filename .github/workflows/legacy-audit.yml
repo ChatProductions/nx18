@@ -1,0 +1,24 @@
+name: Metal 3 legacy baseline audit
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/audit_legacy.py"
+      - ".github/workflows/legacy-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-legacy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch iOS 16.1 / Metal 3 native baseline
+        run: |
+          git clone --depth 1 --branch ios16-ios17-compat https://github.com/widmonstertony/nxnative.git vendor/nxnative
+          git -C vendor/nxnative log -1 --format='%H %s'
+      - name: Audit legacy iOS target and renderer
+        run: python3 scripts/audit_legacy.py vendor/nxnative
