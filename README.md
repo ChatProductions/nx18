@@ -17,6 +17,25 @@ The project has moved beyond a standalone inspection app. The active codepath is
 
 [Engineering state and exact steps](docs/native18_pipeline.md)
 
+## Reuse previous Terminator Windows work (no ROM transfer)
+
+Existing Windows conversion logs confirm Terminator v196608 already had
+extracted ExeFS modules, rewritten ARM64 images, 530 Metal-source shaders,
+and a ~557 MB game IPA. No need to upload or re-extract the game before
+auditing what can be reused.
+
+[Cache reuse / compatibility analysis](docs/terminator-reuse.md)
+
+The read-only [Windows cache auditor](tools/audit_cached_native.py) inspects
+already-produced NSOs, gate tables, old IPA deployment targets and shader
+library chain IDs. Its synthetic regression tests run in the Windows CI.
+It **rejects the assumption** that the prior modern shader chain
+352884811607 can be relabeled for the legacy Metal3 chain.
+
+**Next actual build:** the [Metal3 native shell](.github/workflows/shell18.yml).
+The [Windows pipeline smoke](.github/workflows/rewrite-smoke.yml) uses
+synthetic modules and does not publish or need proprietary game data.
+
 ## First-game test priorities (storage-sensitive)
 
 | Priority | Switch game | Base title ID | Reason |
