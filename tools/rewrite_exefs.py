@@ -19,6 +19,7 @@ import sys
 from pathlib import Path
 
 from nso_probe import inspect_exefs
+from game_targets import target_from_id
 
 MODULE_NAME = re.compile(r"(?:main|rtld|sdk|subsdk[0-9]+)\Z")
 TITLE_ID = re.compile(r"[0-9a-fA-F]{16}\Z")
@@ -95,6 +96,8 @@ def run_rewrite(exefs: Path, upstream: Path, output: Path, *,
         "source_exefs": str(exefs.resolve()),
         "source_revision": git_revision(upstream),
         "title_id": title_id.upper(),
+        "target_name": target_from_id(title_id).name,
+        "target_priority": target_from_id(title_id).priority,
         "upstream_rewriter": str(rewrite),
         "platform": "Windows-compatible Python subprocess",
         "requested_workers": jobs,
@@ -134,7 +137,7 @@ def run_rewrite(exefs: Path, upstream: Path, output: Path, *,
     mf = output / "rewrite-manifest.json"
     mf.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     print(f"[nx18] {len(manifest['modules'])} modules rewritten; manifest: {mf}", flush=True)
-    print("[nx18] Native runtime / signing / shaders / AC2 gameplay NOT tested.", flush=True)
+    print("[nx18] Native runtime / signing / shaders / actual game gameplay NOT tested.", flush=True)
     return manifest
 
 
@@ -144,7 +147,8 @@ def main(argv=None) -> int:
     parser.add_argument("--upstream", required=True, type=Path,
                         help="Local nxnative checkout, e.g. vendor/nxnative")
     parser.add_argument("--output", type=Path, default=Path("work") / "rewrite")
-    parser.add_argument("--title-id", default="0100670014482000")
+    parser.add_argument("--title-id", default="0100B51020B68000",
+                        help="Switch base title ID (default: Terminator 2D)")
     parser.add_argument("--jobs", type=int, default=2)
     args = parser.parse_args(argv)
     try:
