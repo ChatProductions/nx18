@@ -1,0 +1,71 @@
+name: Build native iOS18 Metal3 game-free shell
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "LegacyShell/**"
+      - ".github/workflows/shell18.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-shell:
+    runs-on: macos-15
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: "16.4"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install shell compiler support
+        run: |
+          brew install xcodegen
+          python3 -m pip install "fonttools>=4.0,<5"
+          xcodebuild -version
+      - name: Fetch real Metal3 host and game-free packaging source
+        run: |
+          git clone --depth 1 --branch ios16-ios17-compat \
+            https://github.com/widmonstertony/nxnative.git vendor/legacy
+          git clone --depth 1 --branch main \
+            https://github.com/xinerqu/ns2ios-shell.git vendor/shell
+          echo "Legacy source:"
+          git -C vendor/legacy rev-parse HEAD
+          echo "Shell source:"
+          git -C vendor/shell rev-parse HEAD
+      - name: Backport signed Guest loader to Metal3 host
+        run: |
+          python3 LegacyShell/apply_legacy_shell.py \
+            --legacy vendor/legacy --shell vendor/shell
+      - name: Build unsigned native iOS17 host using hosted Xcode
+        run: |
+          bash LegacyShell/build_shell18.sh vendor/legacy "$GITHUB_WORKSPACE/build/shell18"
+      - name: Record minimal runtime audit
+        if: always()
+        run: |
+          echo "Build host: iOS17/18; legacy Metal3; not an AC2 port" > shell18-summary.txt
+          git -C vendor/legacy rev-parse HEAD >> shell18-summary.txt || true
+          git -C vendor/shell rev-parse HEAD >> shell18-summary.txt || true
+          if [ -f build/shell18/macho-target.txt ]; then
+            cat build/shell18/macho-target.txt >> shell18-summary.txt
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nx18-metal3-shell18-diagnostics
+          path: |
+            shell18-summary.txt
+            build/shell18/xcodebuild.log
+            build/shell18/macho-target.txt
+          if-no-files-found: ignore
+      - name: Publish game-free shell artifact only if built
+        uses: actions/upload-artifact@v4
+        with:
+          name: nx18-metal3-gamefree-unsigned
+          path: build/shell18/nx18-metal3-gamefree-unsigned.ipa
+          if-no-files-found: error
