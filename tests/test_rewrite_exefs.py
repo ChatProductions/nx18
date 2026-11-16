@@ -50,7 +50,7 @@ class WrapperTests(unittest.TestCase):
         self.assertTrue(self.calls[0][0][1].endswith("patch_nso.py"))
         self.assertEqual(self.calls[0][2], "0100670014482000")
         self.assertEqual(result["modules"][0]["name"], "main")
-        self.assertTrue((self.output / "main" / "main.patched.bin").exists())
+        self.assertTrue((self.output / "main.patched.bin").exists())
         mf = json.loads((self.output / "rewrite-manifest.json").read_text())
         self.assertEqual(mf["host_or_ipa_built"], False)
         self.assertIn("sha256", mf["modules"][0]["rewriter_outputs"]["patched.bin"])
