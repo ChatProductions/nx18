@@ -83,7 +83,11 @@ def run_rewrite(exefs: Path, upstream: Path, output: Path, *,
 
     env = os.environ.copy()
     env["DM_GAME"] = title_id.upper()
-    env["DM_REWRITE_J"] = str(jobs)
+    # The legacy fork uses multiprocessing.get_context('fork') inside in_parallel().
+    # Windows cannot fork; 1 worker forces its built-in serial path and avoids
+    # calling signal.pthread_sigmask(), which is also Unix-only.
+    effective_jobs = 1 if os.name == "nt" else jobs
+    env["DM_REWRITE_J"] = str(effective_jobs)
     # Explicitly do not read/copy prod.keys or original game files into this repository.
     manifest = {
         "schema_version": 1,
@@ -93,6 +97,8 @@ def run_rewrite(exefs: Path, upstream: Path, output: Path, *,
         "title_id": title_id.upper(),
         "upstream_rewriter": str(rewrite),
         "platform": "Windows-compatible Python subprocess",
+        "requested_workers": jobs,
+        "effective_workers": effective_jobs,
         "modules": [],
         "host_or_ipa_built": False,
         "gameplay_verified": False,
