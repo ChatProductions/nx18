@@ -5,6 +5,7 @@ on:
     paths:
       - "tools/rewrite_exefs.py"
       - "tools/build_guest18.py"
+      - "tools/game_targets.py"
       - "LegacyShell/**"
       - "tools/nso_probe.py"
       - "tests/test_rewrite_exefs.py"
@@ -65,7 +66,7 @@ jobs:
           work/synthetic/exefs
           --upstream vendor/nxnative
           --output work/rewrite
-          --title-id 0100670014482000
+          --title-id 0100B51020B68000
           --jobs 2
       - name: Build iOS17 signed-code Guest.framework from rewritten ARM64 module
         run: >
