@@ -15,6 +15,22 @@
 **Important: This is not yet a playable AC2 IPA or a full NSP converter.** The NCA decryption/update layering, executable static rewriting, guest service layer, prelinked game binary, NVN integration for BC texture fallback, Metal 3 shader conversion, and final IPA assembly are outstanding. The Studio deliberately does not offer a fake "Play" or "Convert" button. Game code must be linked into a signed iOS-compatible Mach-O before executing; putting an NSP inside an IPA does not port it.
 
 
+### Windows ARM64 rewrite stage (now wired to actual nxnative source)
+
+The wrapper **calls the real** `dm/tools/patch_nso.py` in the iOS 16/17 legacy nxnative fork rather than using a dummy rewriter. It keeps the existing NSO preflight, records input/output SHA-256 hashes and verifies the output contains patched native images and host fixup/gate tables. This stage makes no IPA and does not require an Apple download.
+
+On your Windows machine, clone nx18 or pull the latest changes, then open PowerShell in the repository:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\setup-windows.ps1
+python .\tools\rewrite_exefs.py "F:\Roms\AC2\exefs" --upstream .\vendor\nxnative --output .\work\rewrite --title-id 0100670014482000 --jobs 2
+```
+
+Use your **already extracted, decrypted ExeFS** directory. `main`, `rtld`, `sdk` and `subsdk*` are ordinary NSO files; an NSP/XCI is not valid input to this command. Output is under `work/rewrite/` with `rewrite-manifest.json`. The upstream checkout's exact Git revision is recorded, so subsequent builds can be reproduced. Do not upload your game files or keys to GitHub.
+
+**Unverified:** nxnative's rewriter has not yet been run on your actual AC2 NSOs, and the resulting output has not been linked to the iOS18 Metal3 host. You will still need to sign an eventual game IPA.
+
+
 ## Device-first workflow, Windows fallback
 
 **Priority:** on-device conversion and packaging on the iPhone. Windows is permitted only for tasks that cannot practically be completed on-device. No requirement to download from Apple's Developer website or install the Apple Metal Developer Tools for Windows.
