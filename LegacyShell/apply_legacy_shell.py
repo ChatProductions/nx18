@@ -129,6 +129,11 @@ static char *g_argv[20]; static int g_argc;""",
     if not launcher.is_file():
         raise RuntimeError("legacy launcher Swift source is missing")
     swift = launcher.read_text(encoding="utf-8")
+    modern_menu_binding = '    gameMenuModel = model   // the in-game menu shows and saves the same choices (GameMenu.swift)'
+    if swift.count(modern_menu_binding) != 1:
+        raise RuntimeError("modern GameMenu model binding changed in legacy Launcher.swift")
+    swift = swift.replace(modern_menu_binding,
+        '    // nx18 legacy: gameMenuModel is part of excluded modern-only GameMenu.swift.')
     glass = ('if #available(iOS 26.0, *) { '
              'button.buttonStyle(.glassProminent) } else { '
              'button.buttonStyle(.borderedProminent) }')
