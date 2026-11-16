@@ -24,6 +24,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Verify iOS17 native-shell source overlay
+        run: python3 -m unittest discover -s tests -p "test_legacy_shell_overlay.py" -v
       - name: Install shell compiler support
         run: |
           brew install xcodegen
@@ -50,7 +52,7 @@ jobs:
       - name: Record minimal runtime audit
         if: always()
         run: |
-          echo "Build host: iOS17/18; legacy Metal3; not an AC2 port" > shell18-summary.txt
+          echo "Build host: iOS17/18, Metal3, native signed-code loader; no commercial game content" > shell18-summary.txt
           git -C vendor/legacy rev-parse HEAD >> shell18-summary.txt || true
           git -C vendor/shell rev-parse HEAD >> shell18-summary.txt || true
           if [ -f build/shell18/macho-target.txt ]; then
