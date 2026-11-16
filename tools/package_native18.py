@@ -117,6 +117,19 @@ def package(shell: Path, guest: Path, rewritten: Path,
     if guest_manifest.get("image_sha256") != digest(guest / "Guest"):
         raise ValueError("Guest.framework binary does not match signed-code manifest")
     module_names = {x["name"] for x in rewrite_manifest["modules"]}
+    if set(guest_manifest.get("modules", [])) != module_names:
+        raise ValueError("Guest.framework module list differs from the rewrite manifest")
+    # Recheck the on-disk tables and code against the hashes recorded by the
+    # actual rewriter. Sharing a title ID alone does not prove these binaries
+    # belong to the same build (e.g. base vs update).
+    for entry in rewrite_manifest["modules"]:
+        name = entry["name"]
+        for suffix, record in entry.get("rewriter_outputs", {}).items():
+            expected = record.get("sha256")
+            candidate = rewritten / (name + "." + suffix)
+            if not expected or not candidate.is_file() or digest(candidate) != expected:
+                raise ValueError("rewrite artifact changed since Guest.framework generation: " +
+                                 candidate.name)
     if "main" not in module_names or not (module_names - {"rtld"}).issubset(
             set(fields["modules"].split())):
         raise ValueError("guest modules and runtime profile disagree")
