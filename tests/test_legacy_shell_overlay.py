@@ -42,6 +42,9 @@ static char *g_argv[4]; static int g_argc;
         munmap((void *)e->rx, e->rx_size);
     }   // a served image stays mapped in the layout
 """)
+        self._write(self.legacy / "dm/host/hle_hid.c",
+                    '                if (!strcmp(line, "restop")) { void dm_gfx_restop(void); dm_gfx_restop(); continue; }'
+                    '   // what the residency set holds (nvn_mtl.m res_top)\n')
         self._write(self.legacy / "dm/host/loader_legacy.inc",
                     "int dm_set_game_image_header(const void *header) { return 1; }\n")
         self._write(self.legacy / "dm/ios/Sources/DmGraphicsCapabilities.h",
@@ -139,6 +142,11 @@ if (fabs((dw / dh) / ((double)cw / ch) - 1) < 0.01) vp = (MTLViewport){0, 0, dw,
         self.assertIn('die("nx18 iOS17: nn::jit requires offline signed-image integration")', jit)
         self.assertIn("serve = dm_jit_serve_dir();", jit)
         self.assertNotIn("const char *serve = dm_jit_serve_dir();", jit)
+        hid = (self.legacy / "dm/host/hle_hid.c").read_text()
+        self.assertIn("restop unavailable in the iOS17 Metal3 legacy renderer", hid)
+        self.assertIn("#if TARGET_OS_IPHONE && !defined(DM_NVN_MODERN_RENDERER)", hid)
+        self.assertIn("dm_gfx_restop();", hid)
+
 
 
 
@@ -153,6 +161,12 @@ if (fabs((dw / dh) / ((double)cw / ch) - 1) < 0.01) vp = (MTLViewport){0, 0, dw,
     def test_refuse_missing_legacy_chain(self):
         (self.legacy / "dm/gfx/nvn/legacy/dmsh_chain.h").unlink()
         with self.assertRaisesRegex(RuntimeError, "missing upstream"):
+            apply(self.legacy, self.shell)
+
+    def test_reject_unrecognized_restop_command(self):
+        hid = self.legacy / "dm/host/hle_hid.c"
+        hid.write_text("new diagnostics command API\n")
+        with self.assertRaisesRegex(RuntimeError, "restop handler changed"):
             apply(self.legacy, self.shell)
 
     def test_reject_unrecognized_jit_entry(self):

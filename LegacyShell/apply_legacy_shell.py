@@ -246,6 +246,32 @@ static char *g_argv[20]; static int g_argc;""",
     jit.write_text(jit_source, encoding="utf-8")
 
 
+    # Modern hle_hid.c's DM_CTL "restop" is a diagnostics-only graphics
+    # residency dump from the newer renderer. The iOS17 Metal3 renderer
+    # does not export dm_gfx_restop(), so retaining that call fails arm64
+    # linking. Keep the command intact on modern builds and Mac hosts;
+    # report the unavailable command explicitly on legacy iPhones.
+    hid = legacy / "dm/host/hle_hid.c"
+    if not hid.is_file():
+        raise RuntimeError("legacy HID service source is missing")
+    hid_source = hid.read_text(encoding="utf-8")
+    restop_call = ('                if (!strcmp(line, "restop")) { '
+                   'void dm_gfx_restop(void); dm_gfx_restop(); continue; }'
+                   '   // what the residency set holds (nvn_mtl.m res_top)')
+    if hid_source.count(restop_call) != 1:
+        raise RuntimeError("upstream DM_CTL restop handler changed; review legacy renderer ABI")
+    restop_legacy = """                if (!strcmp(line, "restop")) {
+#if TARGET_OS_IPHONE && !defined(DM_NVN_MODERN_RENDERER)
+                    LOG("DM_CTL: restop unavailable in the iOS17 Metal3 legacy renderer");
+#else
+                    void dm_gfx_restop(void);
+                    dm_gfx_restop();
+#endif
+                    continue;
+                }"""
+    hid.write_text(hid_source.replace(restop_call, restop_legacy, 1),
+                   encoding="utf-8")
+
     # The newer vi::ListFrameHistory service reads queued/completed
     # presentation ticket counts. The legacy Metal3 renderer already owns
     # g_pq_in and g_pq_done but lacked the small locked accessor expected by
