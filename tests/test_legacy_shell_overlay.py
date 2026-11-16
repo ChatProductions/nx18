@@ -44,9 +44,15 @@ static char *g_argv[4]; static int g_argc;
 """)
         self._write(self.legacy / "dm/host/hle_hid.c",
                     '                if (!strcmp(line, "restop")) { void dm_gfx_restop(void); dm_gfx_restop(); continue; }'
-                    '   // what the residency set holds (nvn_mtl.m res_top)\n')
+                    '   // what the residency set holds (nvn_mtl.m res_top)\n'
+                    '                    if (sscanf(line + 8, "%31s %llx %lli %511s", key, &a, &n, path) == 4) '
+                    'dm_gfx_bufsnap(key, a, (size_t)n, path); '
+                    'else LOG("DM_CTL: bufsnap <shader key> <hex address> <bytes> <path>"); continue; }\n')
         self._write(self.legacy / "dm/host/loader_legacy.inc",
-                    "int dm_set_game_image_header(const void *header) { return 1; }\n")
+                    "int dm_set_game_image_header(const void *header) { return 1; }\n"
+                    "int dm_main_imports(const char *prefix) { return 0; }\n")
+        self._write(self.legacy / "dm/host/hle_lifecycle.c",
+                    "#include <unistd.h>\n")
         self._write(self.legacy / "dm/ios/Sources/DmGraphicsCapabilities.h",
                     '    if (@available(iOS 26.0, *)) {\n'
                     '        interpolation = [MTLFXFrameInterpolatorDescriptor supportsDevice:device];\n'
@@ -146,6 +152,20 @@ if (fabs((dw / dh) / ((double)cw / ch) - 1) < 0.01) vp = (MTLViewport){0, 0, dw,
         self.assertIn("restop unavailable in the iOS17 Metal3 legacy renderer", hid)
         self.assertIn("#if TARGET_OS_IPHONE && !defined(DM_NVN_MODERN_RENDERER)", hid)
         self.assertIn("dm_gfx_restop();", hid)
+        self.assertIn("bufsnap unavailable in the iOS17 Metal3 legacy renderer", hid)
+        self.assertIn("#if TARGET_OS_IPHONE && !defined(DM_NVN_MODERN_RENDERER)", hid)
+        self.assertIn("dm_gfx_bufsnap(key, a, (size_t)n, path);", hid)
+        loader = (self.legacy / "dm/host/loader_legacy.inc").read_text()
+        self.assertIn("int dm_game_imports(const char *prefix)", loader)
+        self.assertIn('g_mod[i].nro || !strcmp(g_mod[i].name, "main")', loader)
+        self.assertIn("m->symtab[k].st_shndx", loader)
+        lifecycle = (self.legacy / "dm/host/hle_lifecycle.c").read_text()
+        self.assertIn("void dm_gfx_quit_begin(void)", lifecycle)
+        self.assertIn("void dm_gfx_quit(int budget_ms)", lifecycle)
+        self.assertIn("nvn_cache_flush();", lifecycle)
+        self.assertIn("dispatch_semaphore_wait", lifecycle)
+        self.assertIn("#if TARGET_OS_IPHONE && !defined(DM_NVN_MODERN_RENDERER)", lifecycle)
+
 
 
 
@@ -161,6 +181,18 @@ if (fabs((dw / dh) / ((double)cw / ch) - 1) < 0.01) vp = (MTLViewport){0, 0, dw,
     def test_refuse_missing_legacy_chain(self):
         (self.legacy / "dm/gfx/nvn/legacy/dmsh_chain.h").unlink()
         with self.assertRaisesRegex(RuntimeError, "missing upstream"):
+            apply(self.legacy, self.shell)
+
+    def test_reject_unrecognized_import_scanner(self):
+        loader = self.legacy / "dm/host/loader_legacy.inc"
+        loader.write_text("legacy imports API moved\n")
+        with self.assertRaisesRegex(RuntimeError, "main-import symbol scanner"):
+            apply(self.legacy, self.shell)
+
+    def test_reject_unrecognized_shutdown_abi(self):
+        life = self.legacy / "dm/host/hle_lifecycle.c"
+        life.write_text("modern-only graphics shutdown API\n")
+        with self.assertRaisesRegex(RuntimeError, "shutdown ABI changed"):
             apply(self.legacy, self.shell)
 
     def test_reject_unrecognized_restop_command(self):

@@ -104,6 +104,34 @@ static char *g_argv[20]; static int g_argc;""",
     dm_host_preload_start(g_argc, g_argv);''',
         "main.m native preload",
     )
+    # The modern font/save-data service asks about imports in main AND
+    # dynamically loaded NROs. The older Metal3 loader already parses real
+    # ELF symbols but only exposes dm_main_imports(). Implement the expanded
+    # query on those parsed symbol tables; never return a fabricated answer.
+    loader_source = loader.read_text(encoding="utf-8")
+    main_imports = "int dm_main_imports(const char *prefix) {"
+    if loader_source.count(main_imports) != 1 or "int dm_game_imports(" in loader_source:
+        raise RuntimeError("legacy main-import symbol scanner changed upstream")
+    start = loader_source.index(main_imports)
+    end = loader_source.find("\n}\n", start)
+    if end == -1:
+        raise RuntimeError("unterminated legacy main-import symbol scanner")
+    expanded_imports = """
+// nx18 iOS17: match modern loader semantics for main and NRO imports.
+int dm_game_imports(const char *prefix) {
+    size_t n = strlen(prefix);
+    for (int i = 0; i < g_nmod; i++) if (g_mod[i].nro || !strcmp(g_mod[i].name, "main")) {
+        module_t *m = &g_mod[i];
+        for (unsigned k = 1; k < m->nsym; k++)
+            if (!m->symtab[k].st_shndx && !strncmp(m->strtab + m->symtab[k].st_name, prefix, n))
+                return 1;
+    }
+    return 0;
+}
+"""
+    loader_source = loader_source[:end + 3] + expanded_imports + loader_source[end + 3:]
+    loader.write_text(loader_source, encoding="utf-8")
+
     # The legacy host already has a runtime game profile (DM_PROFILE), so
     # preserve each game's real memory layout, title ID and RomFS marker
     # instead of hardcoding the neutral shell profile.
@@ -269,8 +297,66 @@ static char *g_argv[20]; static int g_argc;""",
 #endif
                     continue;
                 }"""
+
+    # GPU buffer snapshots are a developer-only DM_CTL command added by
+    # the modern renderer. Its callable entry is absent in legacy Metal3.
+    # Preserve the command on modern platforms; expose honest diagnostics
+    # on the legacy iPhone rather than inventing captured GPU data.
+    bufsnap_call = ('                    if (sscanf(line + 8, "%31s %llx %lli %511s", '
+                    'key, &a, &n, path) == 4) dm_gfx_bufsnap(key, a, (size_t)n, path); '
+                    'else LOG("DM_CTL: bufsnap <shader key> <hex address> <bytes> <path>"); '
+                    'continue; }')
+    if hid_source.count(bufsnap_call) != 1:
+        raise RuntimeError("upstream DM_CTL bufsnap handler changed; review Metal3")
+    bufsnap_legacy = """#if TARGET_OS_IPHONE && !defined(DM_NVN_MODERN_RENDERER)
+                    LOG("DM_CTL: bufsnap unavailable in the iOS17 Metal3 legacy renderer");
+#else
+                    if (sscanf(line + 8, "%31s %llx %lli %511s", key, &a, &n, path) == 4)
+                        dm_gfx_bufsnap(key, a, (size_t)n, path);
+                    else LOG("DM_CTL: bufsnap <shader key> <hex address> <bytes> <path>");
+#endif
+                    continue; }"""
+    hid_source = hid_source.replace(bufsnap_call, bufsnap_legacy, 1)
     hid.write_text(hid_source.replace(restop_call, restop_legacy, 1),
                    encoding="utf-8")
+
+    # Modern exit/handoff saves Metal pipelines through dm_gfx_quit*.
+    # The legacy renderer owns a real MTLBinaryArchive persistence API,
+    # nvn_cache_flush(), but not these lifecycle entry points. Adapt the
+    # modern, deadline-bounded lifecycle to the actual legacy archive.
+    # Avoid fake successful writes or blocking indefinitely on shutdown.
+    lifecycle = legacy / "dm/host/hle_lifecycle.c"
+    if not lifecycle.is_file():
+        raise RuntimeError("legacy host shutdown source is missing")
+    life_src = lifecycle.read_text(encoding="utf-8")
+    life_anchor = "#include <unistd.h>\n"
+    if life_src.count(life_anchor) != 1 or "void dm_gfx_quit_begin(" in life_src:
+        raise RuntimeError("legacy graphics shutdown ABI changed upstream")
+    life_bridge = """#if TARGET_OS_IPHONE && !defined(DM_NVN_MODERN_RENDERER)
+// The legacy NVN Metal3 cache really serializes its MTLBinaryArchive.
+void nvn_cache_flush(void);
+static dispatch_once_t g_nx18_cache_quit_once;
+static dispatch_semaphore_t g_nx18_cache_quit_done;
+void dm_gfx_quit_begin(void) {
+    dispatch_once(&g_nx18_cache_quit_once, ^{
+        g_nx18_cache_quit_done = dispatch_semaphore_create(0);
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+            nvn_cache_flush();
+            dispatch_semaphore_signal(g_nx18_cache_quit_done);
+        });
+    });
+}
+void dm_gfx_quit(int budget_ms) {
+    dm_gfx_quit_begin();
+    if (budget_ms <= 0) return;
+    if (dispatch_semaphore_wait(g_nx18_cache_quit_done,
+            dispatch_time(DISPATCH_TIME_NOW, (int64_t)budget_ms * NSEC_PER_MSEC)))
+        LOG("nx18 iOS17: Metal3 pipeline archive flush exceeded shutdown budget");
+}
+#endif
+"""
+    lifecycle.write_text(life_src.replace(life_anchor, life_anchor + life_bridge, 1),
+                         encoding="utf-8")
 
     # The newer vi::ListFrameHistory service reads queued/completed
     # presentation ticket counts. The legacy Metal3 renderer already owns
