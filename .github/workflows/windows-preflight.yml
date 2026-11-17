@@ -6,6 +6,7 @@ on:
     paths:
       - "tools/nso_probe.py"
       - "tools/rewrite_exefs.py"
+      - "tools/continue_native18.py"
       - "tools/game_targets.py"
       - "tools/build_guest18.py"
       - "tools/package_native18.py"
@@ -13,12 +14,14 @@ on:
       - "tests/test_cached_native.py"
       - "tests/test_nso_probe.py"
       - "tests/test_rewrite_exefs.py"
+      - "tests/test_continue_native18.py"
       - "tests/test_game_targets.py"
       - "tests/test_title_binding.py"
       - "tests/test_legacy_shell_overlay.py"
       - "LegacyShell/apply_legacy_shell.py"
       - "LegacyShell/NX18Guest.m"
       - "scripts/setup-windows.ps1"
+      - "scripts/continue-native18.ps1"
       - ".github/workflows/windows-preflight.yml"
   workflow_dispatch:
 
@@ -42,6 +45,7 @@ jobs:
         run: |
           python tools/nso_probe.py --help
           python tools/rewrite_exefs.py --help
+          python tools/continue_native18.py --help
 
       - name: Publish Windows native-pipeline test result
         if: always()

@@ -4,6 +4,8 @@ on:
     branches: [main]
     paths:
       - "tools/rewrite_exefs.py"
+      - "tools/continue_native18.py"
+      - "scripts/continue-native18.ps1"
       - "tools/build_guest18.py"
       - "tools/game_targets.py"
       - "LegacyShell/**"
@@ -72,20 +74,14 @@ jobs:
           print("Fixture:", target / "main")
           '@ | python -
           if ($LASTEXITCODE -ne 0) { throw "Fixture generation failed" }
-      - name: Run production nx18 wrapper against REAL nxnative rewriter
+      - name: Continue exported ExeFS through real rewriter and Guest framework
         run: >
-          python tools/rewrite_exefs.py
+          python tools/continue_native18.py
           work/synthetic/exefs
           --upstream vendor/nxnative
-          --output work/rewrite
+          --output work/native-from-phone
           --title-id 0100B51020B68000
           --jobs 2
-      - name: Build iOS17 signed-code Guest.framework from rewritten ARM64 module
-        run: >
-          python tools/build_guest18.py
-          --rewritten work/rewrite
-          --legacy vendor/nxnative
-          --out work/native
       - name: Verify framework Mach-O targets iOS17, not 26
         shell: pwsh
         run: |
@@ -94,8 +90,8 @@ jobs:
           from pathlib import Path
           sys.path.insert(0, str(Path.cwd() / "tools"))
           from build_guest18 import macho_minos, MINOS_17
-          lib = Path("work/native/Guest.framework/Guest")
-          report = json.loads(Path("work/native/guest18-manifest.json").read_text())
+          lib = Path("work/native-from-phone/native/Guest.framework/Guest")
+          report = json.loads(Path("work/native-from-phone/native/guest18-manifest.json").read_text())
           assert macho_minos(lib) == MINOS_17
           assert report["modules"] == ["main"]
           assert not report["embedded_in_ipa"]
@@ -106,15 +102,15 @@ jobs:
         run: >
           python tests/smoke_native18_packaging.py
           --legacy vendor/nxnative
-          --rewritten work/rewrite
-          --native work/native
+          --rewritten work/native-from-phone/rewrite
+          --native work/native-from-phone/native
       - name: Check native output and manifest
         shell: pwsh
         run: |
           @'
           from pathlib import Path
           import json
-          out = Path("work/rewrite")
+          out = Path("work/native-from-phone/rewrite")
           manifest = json.loads((out / "rewrite-manifest.json").read_text())
           assert manifest["modules"][0]["name"] == "main"
           assert manifest["source_revision"]
@@ -130,6 +126,6 @@ jobs:
         with:
           name: nx18-native-rewrite-smoke-report
           path: |
-            work/rewrite/rewrite-manifest.json
-            work/native/guest18-manifest.json
+            work/native-from-phone/rewrite/rewrite-manifest.json
+            work/native-from-phone/native/guest18-manifest.json
           if-no-files-found: ignore
