@@ -150,7 +150,8 @@ if (fabs((dw / dh) / ((double)cw / ch) - 1) < 0.01) vp = (MTLViewport){0, 0, dw,
         self.assertIn("NSPInspector.inspect(url:", view)
         for filename in ("NX18Import.swift", "NX18NSPInspector.swift",
                          "NX18NSPExtractor.swift", "NX18NCAHeader.swift",
-                         "NX18MetalProbe.swift", "NX18BCDecode.swift"):
+                         "NX18MetalProbe.swift", "NX18BCDecode.swift",
+                         "NX18NCAPayload.swift"):
             self.assertTrue((sources / filename).is_file(), filename)
         menu = (self.legacy / "dm/ios/Sources/GameMenu.swift").read_text()
         self.assertNotIn("dm_quit_menu()", menu)

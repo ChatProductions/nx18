@@ -88,32 +88,42 @@ enum NCAHeader {
         if carry != 0 { tweak[0] ^= 0x87 }
     }
 
+    /// Decrypt full NCA3 main + filesystem headers, each in separate 0x200
+    /// AES-XTS sectors with a big-endian tweak sector number.
+    static func cryptSectors(_ input: [UInt8], headerKey: [UInt8],
+                             startingSector: UInt64, encrypt: Bool) throws -> [UInt8] {
+        guard headerKey.count == 32, input.count > 0, input.count % 0x200 == 0,
+              input.count <= 0xC00 else { throw Failure.cipher }
+        let dataKey = Array(headerKey[0..<16])
+        let tweakKey = Array(headerKey[16..<32])
+        var result = [UInt8](repeating: 0, count: input.count)
+        for sector in 0..<(input.count / 0x200) {
+            var sectorNumber = [UInt8](repeating: 0, count: 16)
+            let counter = startingSector + UInt64(sector)
+            for j in 0..<8 {
+                sectorNumber[8+j] = UInt8(truncatingIfNeeded: counter >> (8 * (7-j)))
+            }
+            var tweak = try aesBlock(sectorNumber, key: tweakKey, encrypt: true)
+            for block in 0..<32 {
+                let at = sector * 0x200 + block * 16
+                var pre = [UInt8](repeating: 0, count: 16)
+                for j in 0..<16 { pre[j] = input[at+j] ^ tweak[j] }
+                let transformed = try aesBlock(pre, key: dataKey, encrypt: encrypt)
+                for j in 0..<16 { result[at+j] = transformed[j] ^ tweak[j] }
+                multiplyAlpha(&tweak)
+            }
+        }
+        return result
+    }
+
     /// Nintendo NCA AES-128-XTS: 0x200-byte sectors; sector index
     /// is encoded as a 16-byte BIG-endian integer before tweak encryption.
     /// The first 0x400 bytes suffice to check NCA3 magic and ProgramId.
     static func cryptHeader(_ input: [UInt8], headerKey: [UInt8],
                             encrypt: Bool) throws -> [UInt8] {
-        guard headerKey.count == 32 && input.count == 0x400 else {
-            throw Failure.cipher
-        }
-        let dataKey = Array(headerKey[0..<16])
-        let tweakKey = Array(headerKey[16..<32])
-        var result = [UInt8](repeating: 0, count: input.count)
-
-        for sector in 0..<2 {
-            var sectorNumber = [UInt8](repeating: 0, count: 16)
-            sectorNumber[15] = UInt8(sector)
-            var tweak = try aesBlock(sectorNumber, key: tweakKey, encrypt: true)
-            for block in 0..<32 {
-                let at = sector * 0x200 + block * 16
-                var pre = [UInt8](repeating: 0, count: 16)
-                for j in 0..<16 { pre[j] = input[at + j] ^ tweak[j] }
-                let transformed = try aesBlock(pre, key: dataKey, encrypt: encrypt)
-                for j in 0..<16 { result[at + j] = transformed[j] ^ tweak[j] }
-                multiplyAlpha(&tweak)
-            }
-        }
-        return result
+        guard input.count == 0x400 else { throw Failure.cipher }
+        return try cryptSectors(input, headerKey: headerKey,
+                                startingSector: 0, encrypt: encrypt)
     }
 
     private static func u64(_ b: [UInt8], at: Int) -> UInt64 {

@@ -22,7 +22,7 @@ struct StudioView: View {
     @State private var inspectedIndex: NSPIndex?
     @State private var metalStatus = "Not tested on this device."
     @State private var showingKeyImporter = false
-    @State private var headerKey: [UInt8]?
+    @State private var switchKeys: SwitchKeys?
     @State private var keyStatus = "No header key imported."
 
     var body: some View {
@@ -43,7 +43,7 @@ struct StudioView: View {
                                 .font(.headline)
                             Text("Terminator: 0100B51020B68000")
                                 .font(.caption.monospaced())
-                            Text("Import a base-game NSP to inspect its PFS0 contents. NCA files remain encrypted; title and update verification is not implemented.")
+                            Text("Import a base-game NSP, load your own prod.keys locally, then extract decrypted ExeFS modules for native ARM64 rewriting. This is not yet an on-device game launch.")
                                 .font(.subheadline)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -86,12 +86,21 @@ struct StudioView: View {
                         Text(keyStatus)
                             .font(.footnote)
                             .foregroundStyle(.secondary)
-                        if headerKey != nil {
+                        if switchKeys != nil {
                             Button("Identify encrypted NCA titles") { inspectNCAHeaders() }
                                 .buttonStyle(.bordered)
                                 .disabled(busy)
+
+                            Button {
+                                exportExeFS()
+                            } label: {
+                                Label("Decrypt and extract ExeFS", systemImage: "cpu")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(busy)
                         }
-                        Text("The key is held only in memory and never written to the diagnostic report. Only NCA headers are decrypted; ExeFS and RomFS remain encrypted.")
+                        Text("Keys stay in memory. Supported NCA3 base-game Program archives yield native Switch NSO files; updates, RomFS extraction and native iOS game execution are separate stages.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
@@ -129,7 +138,8 @@ struct StudioView: View {
                     GroupBox("Porting status") {
                         VStack(alignment: .leading, spacing: 6) {
                             Label("PFS0 extraction + NCA header identification: implemented", systemImage: "checkmark.circle")
-                            Label("NCA decryption and updates: not implemented", systemImage: "circle.dashed")
+                            Label("Base-game NCA3 ExeFS extraction: implemented (test-stage)", systemImage: "checkmark.circle")
+                            Label("RomFS and update-layer decryption: not implemented", systemImage: "circle.dashed")
                             Label("ARM64 static rewriting: not implemented", systemImage: "circle.dashed")
                             Label("Metal 3 renderer / A15 texture fallback: not implemented", systemImage: "circle.dashed")
                             Label("Playable unsigned IPA export: not implemented", systemImage: "circle.dashed")
@@ -245,17 +255,49 @@ struct StudioView: View {
             guard let text = String(data: data, encoding: .utf8) else {
                 throw NCAHeader.Failure.invalidHex
             }
-            headerKey = try NCAHeader.headerKey(from: text)
-            keyStatus = "NCA header key loaded in memory; file is not stored."
+            switchKeys = try SwitchKeys(text: text)
+            keyStatus = "Local prod.keys loaded in memory; nothing uploaded."
         } catch {
-            headerKey = nil
+            switchKeys = nil
             keyStatus = "Key import failed: " + error.localizedDescription
+        }
+    }
+
+    private func exportExeFS() {
+        guard let url = inspectedURL, let index = inspectedIndex,
+              let keys = switchKeys else { return }
+        busy = true
+        status = "Decrypting base-game ExeFS directly from selected NSP…"
+        Task.detached(priority: .userInitiated) {
+            let scoped = url.startAccessingSecurityScopedResource()
+            defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+            do {
+                let folder = FileManager.default.urls(for: .documentDirectory,
+                    in: .userDomainMask)[0]
+                    .appendingPathComponent("nx18-native-input", isDirectory: true)
+                    .appendingPathComponent(UUID().uuidString, isDirectory: true)
+                let output = try NCAPayload.exportExeFS(nsp: url, index: index,
+                                                         keys: keys, destination: folder)
+                await MainActor.run {
+                    report = index.report + "\n\nDecrypted ExeFS\nTitle: " +
+                        output.titleID + "\nNCA: " + output.ncaFile +
+                        "\nModules: " + output.modules.joined(separator: ", ") +
+                        "\nSaved in Files > On My iPhone > nx18 > nx18-native-input"
+                    status = "ExeFS extracted. Native ARM64 rewriting and IPA signing still required."
+                    busy = false
+                }
+            } catch {
+                await MainActor.run {
+                    status = "ExeFS extraction failed: " + error.localizedDescription
+                    busy = false
+                }
+            }
         }
     }
 
     private func inspectNCAHeaders() {
         guard let url = inspectedURL, let index = inspectedIndex,
-              let key = headerKey else { return }
+              let key = switchKeys?.headerKey else { return }
         busy = true
         status = "Decrypting NCA headers locally…"
         Task.detached(priority: .userInitiated) {
