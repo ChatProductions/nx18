@@ -379,7 +379,7 @@ void dm_gfx_quit(int budget_ms) {
     # hle_vi.c. Expose its REAL queue state; do not fabricate frame numbers.
     mtl = renderer.read_text(encoding="utf-8")
     progress_anchor = "static uint64_t g_pq_in;"
-    if mtl.count(progress_anchor) != 1 or "void mtl_present_progress(" in mtl:
+    if mtl.count(progress_anchor) != 1:
         raise RuntimeError("legacy present-queue declaration changed upstream")
     progress = '''static uint64_t g_pq_in;
 void mtl_present_progress(uint64_t *queued, uint64_t *done) {
@@ -388,8 +388,21 @@ void mtl_present_progress(uint64_t *queued, uint64_t *done) {
     if (done) *done = g_pq_done;
     pthread_mutex_unlock(&g_pq_mu);
 }'''
-    renderer.write_text(mtl.replace(progress_anchor, progress, 1),
-                        encoding="utf-8")
+    if "void mtl_present_progress(" in mtl:
+        # Upstream recently acquired the real queue-state API. Preserve the
+        # native implementation rather than introducing a second symbol.
+        begin = mtl.index("void mtl_present_progress(")
+        finish = mtl.find("\n}\n", begin)
+        if finish == -1:
+            raise RuntimeError("upstream present-progress API is incomplete")
+        implementation = mtl[begin:finish + 3]
+        for required in ("pthread_mutex_lock(&g_pq_mu)",
+                         "g_pq_in", "g_pq_done", "pthread_mutex_unlock(&g_pq_mu)"):
+            if required not in implementation:
+                raise RuntimeError("upstream present-progress API semantics changed")
+    else:
+        renderer.write_text(mtl.replace(progress_anchor, progress, 1),
+                            encoding="utf-8")
 
     # Newer nn::vi::CreateLayer(width,height) calls mtl_present_layer().
     # The iOS17 Metal3 renderer did not export it. Record the requested VI

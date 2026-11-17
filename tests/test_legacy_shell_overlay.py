@@ -230,6 +230,20 @@ int dm_game_imports(const char *prefix) {
         with self.assertRaisesRegex(RuntimeError, "semantics changed"):
             apply(self.legacy, self.shell)
 
+    def test_upstream_present_progress_not_duplicated(self):
+        renderer = self.legacy / "dm/gfx/nvn/legacy/nvn_mtl_legacy.inc"
+        renderer.write_text(renderer.read_text() + """
+void mtl_present_progress(uint64_t *queued, uint64_t *done) {
+    pthread_mutex_lock(&g_pq_mu);
+    *queued = g_pq_in;
+    *done = g_pq_done;
+    pthread_mutex_unlock(&g_pq_mu);
+}
+""")
+        apply(self.legacy, self.shell)
+        result = renderer.read_text()
+        self.assertEqual(result.count("void mtl_present_progress("), 1)
+
     def test_reject_unrecognized_import_scanner(self):
         loader = self.legacy / "dm/host/loader_legacy.inc"
         loader.write_text(loader.read_text().replace(
