@@ -144,12 +144,12 @@ struct NCAPayloadSmoke {
             precondition(main.prefix(4) == Data("NSO0".utf8))
             precondition(main.count == 64)
             let manifest = dest.appendingPathComponent("nx18-export.json")
-            let export = try JSONSerialization.jsonObject(
+            let exportManifest = try JSONSerialization.jsonObject(
                 with: Data(contentsOf: manifest)) as! [String: Any]
-            precondition(export["title_id"] as? String == "0100B51020B68000")
-            precondition(export["stage"] as? String == "decrypted-exefs")
-            precondition(export["keys_embedded"] as? Bool == false)
-            let records = export["files"] as! [[String: Any]]
+            precondition(exportManifest["title_id"] as? String == "0100B51020B68000")
+            precondition(exportManifest["stage"] as? String == "decrypted-exefs")
+            precondition(exportManifest["keys_embedded"] as? Bool == false)
+            let records = exportManifest["files"] as! [[String: Any]]
             precondition(records.count == 1)
             precondition(records[0]["name"] as? String == "main")
             precondition(records[0]["size_bytes"] as? UInt64 == 64 ||
