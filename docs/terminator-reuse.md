@@ -96,3 +96,33 @@ could not reach the package mirror/upstream checkout, so no real-game
 `Guest.framework` could be produced in that runtime. The existing Windows
 native pipeline remains tested with synthetic input, not with the uploaded
 game code. All assets and gameplay verification remain incomplete.
+
+
+### Runtime-profile evidence from the actual updated NPDM
+
+Both `main.npdm` files are 1,604 bytes. They differ at 510 byte
+positions, **all confined to offsets 0x80–0x27F** (the ACID signature
+and related cryptographic material). Bytes before 0x80 and all bytes
+from 0x280 onward are identical, including both ACID and ACI0 structures.
+The update therefore does not call for a different permission/kernel
+capability profile on the evidence of its NPDM. This observation is NOT
+a verification of the RSA signature.
+
+### Static AArch64 rewrite-site inventory (update)
+
+A byte-pattern scan of the **SHA-256-verified decompressed .text** for
+the four updated NSOs produced these *candidate* sites:
+
+| Module | Code bytes | SVC candidates | MRS instructions | MSR instructions |
+| --- | ---: | ---: | ---: | ---: |
+| main | 36,430,920 | 0 | 119 | 8 |
+| rtld | 7,872 | 6 | 0 | 0 |
+| sdk | 6,611,184 | 58 | 182 | 17 |
+| subsdk0 | 3,509,104 | 0 | 0 | 0 |
+
+These are pattern counts, **not** Capstone-validated control-flow or
+a completed rewrite; embedded data can resemble instruction words.
+The 64 SVC patterns in rtld and sdk are an important native host gate
+candidate set. The port also requires TLS/x18 rewrites, relocations,
+imports, memory layout and runtime services. The output is not playable
+until the actual rewriter runs and game resources/shaders are included.
