@@ -95,7 +95,7 @@ enum NCAPayload {
                     CCCrypt(encrypt ? CCOperation(kCCEncrypt) : CCOperation(kCCDecrypt),
                             CCAlgorithm(kCCAlgorithmAES), CCOptions(kCCOptionECBMode),
                             k.baseAddress, kCCKeySizeAES128, nil,
-                            input.baseAddress, b.count, dst.baseAddress, output.count, &n)
+                            input.baseAddress, b.count, dst.baseAddress, b.count, &n)
                 }
             }
         }

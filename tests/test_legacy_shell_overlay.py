@@ -208,6 +208,28 @@ if (fabs((dw / dh) / ((double)cw / ch) - 1) < 0.01) vp = (MTLViewport){0, 0, dw,
         with self.assertRaisesRegex(RuntimeError, "missing upstream"):
             apply(self.legacy, self.shell)
 
+    def test_upstream_import_scanner_is_not_duplicated(self):
+        loader = self.legacy / "dm/host/loader_legacy.inc"
+        scanner = """
+int dm_game_imports(const char *prefix) {
+    for (int i = 0; i < g_nmod; i++) if (g_mod[i].nro || !strcmp(g_mod[i].name, "main")) {
+        module_t *m = &g_mod[i];
+        if (!m->symtab[k].st_shndx) return 1;
+    }
+    return 0;
+}
+"""
+        loader.write_text(loader.read_text() + scanner)
+        apply(self.legacy, self.shell)
+        self.assertEqual(loader.read_text().count("int dm_game_imports("), 1)
+
+    def test_reject_incompatible_upstream_import_scanner(self):
+        loader = self.legacy / "dm/host/loader_legacy.inc"
+        loader.write_text(loader.read_text() +
+                          "\nint dm_game_imports(const char *x) {\n    return 0;\n}\n")
+        with self.assertRaisesRegex(RuntimeError, "semantics changed"):
+            apply(self.legacy, self.shell)
+
     def test_reject_unrecognized_import_scanner(self):
         loader = self.legacy / "dm/host/loader_legacy.inc"
         loader.write_text(loader.read_text().replace(

@@ -110,12 +110,8 @@ static char *g_argv[20]; static int g_argc;""",
     # query on those parsed symbol tables; never return a fabricated answer.
     loader_source = loader.read_text(encoding="utf-8")
     main_imports = "int dm_main_imports(const char *prefix) {"
-    if loader_source.count(main_imports) != 1 or "int dm_game_imports(" in loader_source:
+    if loader_source.count(main_imports) != 1:
         raise RuntimeError("legacy main-import symbol scanner changed upstream")
-    start = loader_source.index(main_imports)
-    end = loader_source.find("\n}\n", start)
-    if end == -1:
-        raise RuntimeError("unterminated legacy main-import symbol scanner")
     expanded_imports = """
 // nx18 iOS17: match modern loader semantics for main and NRO imports.
 int dm_game_imports(const char *prefix) {
@@ -129,8 +125,27 @@ int dm_game_imports(const char *prefix) {
     return 0;
 }
 """
-    loader_source = loader_source[:end + 3] + expanded_imports + loader_source[end + 3:]
-    loader.write_text(loader_source, encoding="utf-8")
+    if "int dm_game_imports(" in loader_source:
+        # Newer upstream branches already implement this API. Do not insert
+        # a duplicate symbol; verify that it still checks main + NRO imports
+        # rather than silently accepting an incompatible version.
+        begin = loader_source.index("int dm_game_imports(")
+        finish = loader_source.find("\n}\n", begin)
+        if finish == -1:
+            raise RuntimeError("upstream game-import scanner is incomplete")
+        implementation = loader_source[begin:finish + 3]
+        for required in ("g_mod[i].nro", 'g_mod[i].name, "main"',
+                         "m->symtab[k].st_shndx", "return 1;"):
+            if required not in implementation:
+                raise RuntimeError("upstream game-import scanner semantics changed")
+    else:
+        start = loader_source.index(main_imports)
+        end = loader_source.find("\n}\n", start)
+        if end == -1:
+            raise RuntimeError("unterminated legacy main-import symbol scanner")
+        loader_source = (loader_source[:end + 3] + expanded_imports +
+                         loader_source[end + 3:])
+        loader.write_text(loader_source, encoding="utf-8")
 
     # The legacy host already has a runtime game profile (DM_PROFILE), so
     # preserve each game's real memory layout, title ID and RomFS marker
