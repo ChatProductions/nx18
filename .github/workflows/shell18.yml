@@ -5,6 +5,9 @@ on:
     branches: [main]
     paths:
       - "LegacyShell/**"
+      - "Studio/**"
+      - "Runtime/**"
+      - "Tests/NCAPayloadSmoke.swift"
       - "tests/test_legacy_shell_overlay.py"
       - ".github/workflows/shell18.yml"
       - ".github/workflows/native-integration.yml"
