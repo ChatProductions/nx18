@@ -65,3 +65,34 @@ The resulting JSON report contains local absolute paths: keep it private.
 nx18 can also produce a slim unsigned IPA without bundling RomFS. That
 reduces packaging size, but actual local gameplay still needs the game
 data to be present on the phone.
+
+
+## Actual iPhone export comparison (17 November 2026)
+
+Two real, user-supplied **decrypted ExeFS** export ZIPs were validated
+*locally* without putting their game content into GitHub:
+
+| Module | Earlier build ID | Updated build ID | Changed? |
+| --- | --- | --- | --- |
+| main | `8f0efdd5ba1378d406350fffc82f50c9` | `2a5afa507f906ab09ad623dfe7f18862` | Yes |
+| rtld | `2cf5725b70d9684ea3ce2ee7526c3b84` | same | No |
+| sdk | `d83a56a5558798414c78ec722867a7da` | same | No |
+| subsdk0 | `e2970aa61f198ea32fbb247932d90406` | same | No |
+
+The update's `main.npdm` also changed; the size remains 1604 bytes.
+The updated `main` compressed NSO is **25,529,733 bytes**, compared with
+**25,298,605 bytes** previously (+231,128 bytes). Every file passed its
+NX18-export manifest SHA-256 check, and all **12** NSO segments
+decompressed and matched their internal SHA-256 hashes.
+
+**The updated full ExeFS is the native-rewriter input**, not the earlier
+base `main`. The updated main's build ID matches the earlier Windows
+conversion record above. Recording this identity is not a native code
+rewrite and not evidence of an on-device boot.
+
+This repository has no uploaded copyrighted ExeFS or RomFS data. The local
+inspection runtime used for the uploads had no Capstone 5 installation and
+could not reach the package mirror/upstream checkout, so no real-game
+`Guest.framework` could be produced in that runtime. The existing Windows
+native pipeline remains tested with synthetic input, not with the uploaded
+game code. All assets and gameplay verification remain incomplete.

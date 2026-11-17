@@ -24,6 +24,22 @@ MODULE = re.compile(r"(?:main|rtld|sdk|subsdk[0-9]+)\Z")
 SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 EXPORT = "nx18-export.json"
 
+# Real, locally audited Terminator ExeFS main build IDs (no game code stored).
+# A match only identifies the executable revision; it does NOT imply that
+# any game has been rewritten successfully, can boot, or is playable.
+TERMINATOR_MAIN_BUILDS = {
+    "8f0efdd5ba1378d406350fffc82f50c9": "earlier-executable",
+    "2a5afa507f906ab09ad623dfe7f18862": "updated-executable-1.0.3",
+}
+
+
+def executable_revision(title: str, module_build_ids: dict[str, str]) -> str:
+    if title != "0100B51020B68000":
+        return "not-cataloged"
+    return TERMINATOR_MAIN_BUILDS.get(module_build_ids.get("main", ""), "unknown-terminator-build")
+
+
+
 
 def digest(path: Path) -> str:
     checksum = hashlib.sha256()
@@ -87,6 +103,10 @@ def validate_export(exefs: Path, selected_title: str | None) -> dict:
 
     report = inspect_exefs(exefs)
     names = {row["filename"] for row in report["modules"]}
+    module_build_ids = {
+        row["filename"]: row["module_id_hex"][:32].lower()
+        for row in report["modules"]
+    }
     if not report["ready_for_rewriter"] or "main" not in names:
         raise ValueError("decrypted NSO preflight failed: " +
                          json.dumps(report["errors"]))
@@ -97,6 +117,8 @@ def validate_export(exefs: Path, selected_title: str | None) -> dict:
         "modules": sorted(names),
         "export_manifest_verified": manifest_path.is_file(),
         "nso_header_verified": True,
+        "module_build_ids": module_build_ids,
+        "executable_revision": executable_revision(actual_title, module_build_ids),
         "gameplay_verified": False,
     }
 
@@ -132,6 +154,8 @@ def continue_native(exefs: Path, upstream: Path, output: Path, *,
         "export_manifest_verified": binding["export_manifest_verified"],
         "nso_header_verified": True,
         "modules": binding["modules"],
+        "module_build_ids": binding["module_build_ids"],
+        "executable_revision": binding["executable_revision"],
         "rewritten_manifest": str(rewrite / "rewrite-manifest.json"),
         "guest_framework": guest["guest_framework"],
         "guest_manifest": str(native / "guest18-manifest.json"),

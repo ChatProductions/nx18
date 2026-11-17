@@ -131,6 +131,26 @@ class HandoffTests(unittest.TestCase):
         report = json.loads((self.work / "pipeline-report.json").read_text())
         self.assertEqual(report["stage"], "rewritten-arm64-and-ios17-guest")
 
+    def test_real_terminator_update_build_id_is_selected_without_changing_title(self):
+        from continue_native18 import TERMINATOR_MAIN_BUILDS
+        main = self.exefs / "main"
+        content = bytearray(main.read_bytes())
+        content[0x40:0x50] = bytes.fromhex("2a5afa507f906ab09ad623dfe7f18862")
+        main.write_bytes(content)
+        self.manifest["files"][0]["sha256"] = hashlib.sha256(content).hexdigest()
+        (self.exefs / "nx18-export.json").write_text(json.dumps(self.manifest))
+        data = validate_export(self.exefs, None)
+        self.assertEqual(data["executable_revision"], "updated-executable-1.0.3")
+        self.assertEqual(data["module_build_ids"]["main"],
+                         "2a5afa507f906ab09ad623dfe7f18862")
+        self.assertEqual(data["title_id"], "0100B51020B68000")
+        self.assertIn(data["module_build_ids"]["main"], TERMINATOR_MAIN_BUILDS)
+
+    def test_unknown_terminator_build_is_not_falsely_labeled_playable(self):
+        data = validate_export(self.exefs, None)
+        self.assertEqual(data["executable_revision"], "unknown-terminator-build")
+        self.assertFalse(data["gameplay_verified"])
+
     def test_cli_verify_only(self):
         self.assertEqual(main([str(self.exefs), "--verify-only"]), 0)
         self.assertFalse(self.work.exists())
