@@ -30,6 +30,10 @@ jobs:
           python-version: "3.12"
       - name: Verify iOS17 native-shell source overlay
         run: python3 -m unittest discover -s tests -p "test_legacy_shell_overlay.py" -v
+      - name: Verify synthetic AES-encrypted NCA to ExeFS before native shell build
+        run: |
+          swiftc -parse-as-library Studio/NSPInspector.swift Studio/NCAHeader.swift Studio/NCAPayload.swift Tests/NCAPayloadSmoke.swift -o /tmp/nx18-nca-exefs-smoke
+          /tmp/nx18-nca-exefs-smoke
       - name: Install shell compiler support
         run: |
           brew install xcodegen
