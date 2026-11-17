@@ -129,6 +129,15 @@ struct StudioView: View {
                         .buttonStyle(.bordered)
                         .disabled(busy)
 
+                        Button {
+                            loadKeysFromInbox()
+                        } label: {
+                            Label("Load prod.keys from NSP-Inbox (no picker)",
+                                  systemImage: "folder.badge.plus")
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(busy)
+
                         Text(keyStatus)
                             .font(.footnote)
                             .foregroundStyle(.secondary)
@@ -321,6 +330,30 @@ struct StudioView: View {
         }
     }
 
+
+    private func loadKeysFromInbox() {
+        let documents = FileManager.default.urls(for: .documentDirectory,
+            in: .userDomainMask)[0]
+        let inInbox = documents.appendingPathComponent("NSP-Inbox", isDirectory: true)
+            .appendingPathComponent("prod.keys")
+        let inRoot = documents.appendingPathComponent("prod.keys")
+        guard let file = [inInbox, inRoot].first(where: {
+            FileManager.default.fileExists(atPath: $0.path)
+        }) else {
+            keyStatus = "Copy your own prod.keys into NSP-Inbox, then tap this button again."
+            return
+        }
+        loadKeys(file)
+        if switchKeys != nil && file == inInbox {
+            // The key material is retained in memory only, not backed up.
+            do {
+                try FileManager.default.removeItem(at: file)
+                keyStatus = "Loaded keys in memory. The temporary inbox copy was deleted."
+            } catch {
+                keyStatus = "Loaded keys. Delete prod.keys from NSP-Inbox manually."
+            }
+        }
+    }
 
     private func loadKeys(_ url: URL) {
         let scoped = url.startAccessingSecurityScopedResource()

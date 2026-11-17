@@ -160,6 +160,7 @@ if (fabs((dw / dh) / ((double)cw / ch) - 1) < 0.01) vp = (MTLViewport){0, 0, dw,
         self.assertIn("NSPInspector.inspect(url:", view)
         self.assertIn('NX18DocumentPicker.open(', view)
         self.assertIn('NSP-Inbox', view)
+        self.assertIn('loadKeysFromInbox()', view)
         self.assertIn('refreshNSPInbox()', view)
         self.assertNotIn('.fileImporter(', view)
         native_picker = (sources / "NX18DocumentPicker.swift").read_text()
