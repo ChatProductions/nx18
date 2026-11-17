@@ -173,7 +173,7 @@ enum NCAPayload {
                 if entry.length < 0x2B0 { continue }
                 let ticket = try exact(h, offset: entry.offset, count: 0x2B0)
                 if Array(ticket[0x2A0..<0x2B0]) != rights { continue }
-                guard ticket[0x285] == 0 else {
+                guard ticket[0x281] == 0 else {
                     throw NCAPayloadError.unsupported("Personalized tickets cannot be decrypted by this importer")
                 }
                 return try ecb(Array(ticket[0x180..<0x190]),
@@ -306,6 +306,10 @@ enum NCAPayload {
             try fm.createDirectory(at: destination, withIntermediateDirectories: true)
             var completed = false
             defer { if !completed { try? fm.removeItem(at: destination) } }
+            // Decrypted game binaries can be large and must not be synced into
+            // ordinary device backups just because they are in Documents.
+            var localFolder = destination
+            try localFolder.setResourceValue(true, forKey: .isExcludedFromBackupKey)
             for (name, rel, size) in files {
                 let target = destination.appendingPathComponent(name)
                 guard fm.createFile(atPath: target.path, contents: nil) else {

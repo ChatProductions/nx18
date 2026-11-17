@@ -94,7 +94,8 @@ struct NCAPayloadSmoke {
         let nca = cryptHeader + section
 
         var ticket = [UInt8](repeating: 0, count: 0x2C0)
-        ticket[0x285] = 0 // Common ticket
+        ticket[0x281] = 0 // Common title-key type; 0x285 is a master-key revision.
+        ticket[0x285] = 1 // Nonzero revision must not be mistaken for personalized ticket
         ticket.replaceSubrange(0x180..<0x190, with: ecb(dataKey, titlekek, encrypt: true))
         ticket.replaceSubrange(0x2A0..<0x2B0, with: rights)
         let names = Array((ticketed ? "sample.nca\0sample.tik\0" : "sample.nca\0").utf8)
@@ -143,6 +144,28 @@ struct NCAPayloadSmoke {
             precondition(main.prefix(4) == Data("NSO0".utf8))
             precondition(main.count == 64)
         }
+        let personalized = dir.appendingPathComponent("personalized.nsp")
+        var personalizedData = try makeNSP(ticketed: true, headerKey: header,
+                                           areaKey: area, titlekek: titlekek,
+                                           dataKey: dataKey)
+        let candidate = dir.appendingPathComponent("ticket-offset.nsp")
+        try personalizedData.write(to: candidate)
+        let containerIndex = try NSPInspector.inspect(url: candidate)
+        guard let ticketEntry = containerIndex.entries.first(where: { $0.name.hasSuffix(".tik") }) else {
+            fatalError("Synthetic ticket missing")
+        }
+        let offset = Int(ticketEntry.offset)
+        personalizedData[offset + 0x281] = 1
+        try personalizedData.write(to: personalized)
+        do {
+            let parsed = try NSPInspector.inspect(url: personalized)
+            _ = try NCAPayload.exportExeFS(nsp: personalized, index: parsed,
+                                           keys: keys, destination: dir.appendingPathComponent("personalized"))
+            fatalError("Personalized ticket was incorrectly treated as common ticket")
+        } catch NCAPayloadError.unsupported {
+            // Expected.
+        }
+
         let bad = dir.appendingPathComponent("wrong.nsp")
         try makeNSP(ticketed: false, headerKey: header,
                     areaKey: area, titlekek: titlekek, dataKey: dataKey).write(to: bad)
