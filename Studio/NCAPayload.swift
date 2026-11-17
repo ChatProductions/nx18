@@ -309,7 +309,9 @@ enum NCAPayload {
             // Decrypted game binaries can be large and must not be synced into
             // ordinary device backups just because they are in Documents.
             var localFolder = destination
-            try localFolder.setResourceValue(true, forKey: .isExcludedFromBackupKey)
+            var backupFlags = URLResourceValues()
+            backupFlags.isExcludedFromBackup = true
+            try localFolder.setResourceValues(backupFlags)
             for (name, rel, size) in files {
                 let target = destination.appendingPathComponent(name)
                 guard fm.createFile(atPath: target.path, contents: nil) else {
