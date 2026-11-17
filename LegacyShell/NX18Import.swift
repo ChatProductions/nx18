@@ -11,3 +11,12 @@ public func nx18ShowNSPStudio(_ viewController: UnsafeMutableRawPointer?) {
     controller.modalPresentationStyle = .fullScreen
     parent.present(controller, animated: false)
 }
+
+
+// The guaranteed launch UI for a game-free NX18 shell.
+// Ownership is deliberately transferred to the UIKit scene root.
+@_cdecl("nx18_make_nsp_studio_root")
+public func nx18MakeNSPStudioRoot() -> UnsafeMutableRawPointer {
+    let controller = UIHostingController(rootView: StudioView())
+    return Unmanaged.passRetained(controller).toOpaque()
+}

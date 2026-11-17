@@ -142,6 +142,13 @@ if (fabs((dw / dh) / ((double)cw / ch) - 1) < 0.01) vp = (MTLViewport){0, 0, dw,
         self.assertIn("bool dm_setting_live(const char *env, const char *value)", legacy_front)
         self.assertIn("return false;", legacy_front)
         self.assertIn("nx18_show_nsp_studio((__bridge void *)self)", legacy_front)
+        self.assertIn("nx18_make_nsp_studio_root()", legacy_front)
+        self.assertIn("(__bridge_transfer UIViewController *)", legacy_front)
+        self.assertLess(legacy_front.index("nx18_make_nsp_studio_root()"),
+                        legacy_front.index("return [DmRootVC new];"))
+        native_importer = (self.legacy / "dm/ios/Sources/NX18Import.swift").read_text()
+        self.assertIn('UIHostingController(rootView: StudioView())', native_importer)
+        self.assertIn('@_cdecl("nx18_make_nsp_studio_root")', native_importer)
         self.assertIn("if (!front_ios_boot_ok()) return;", legacy_front)
         sources = self.legacy / "dm/ios/Sources"
         view = (sources / "NX18StudioView.swift").read_text()

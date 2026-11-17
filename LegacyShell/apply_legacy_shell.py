@@ -499,6 +499,7 @@ bool dm_setting_live(const char *env, const char *value) {
         """const char *front_ios_boot_message(void);
 #ifdef NX18_SHELL
 void nx18_show_nsp_studio(void *view_controller);
+void *nx18_make_nsp_studio_root(void);
 #endif""", "native iOS NSP bridge")
     source = replace_one(source,
         "    front_ios_power_watch();\n    if (!front_ios_boot_ok()) {",
@@ -520,6 +521,19 @@ void nx18_show_nsp_studio(void *view_controller);
 #endif
     if (!front_ios_boot_ok() && front_ios_boot_message() && !self.presentedViewController) {""",
         "native iOS NSP picker presentation")
+    # A game-free app must open its actual importer as the ROOT view.
+    # Older versions tried presenting a modal in viewDidAppear, which left
+    # users looking at the original game launcher with no NSP picker.
+    # Returning UIHostingController directly bypasses that unreliable modal
+    # and makes the Files button visible immediately on app launch.
+    source = replace_one(source,
+        "UIViewController *front_ios_root(void) {",
+        """UIViewController *front_ios_root(void) {
+#ifdef NX18_SHELL
+    if (!front_ios_boot_ok()) {
+        return (__bridge_transfer UIViewController *)nx18_make_nsp_studio_root();
+    }
+#endif""", "native iOS root NSP importer")
     frontend.write_text(source, encoding="utf-8")
 
     # The Studio importer already handles fileImporter, PFS0 indexing and
