@@ -283,7 +283,7 @@ struct StudioView: View {
                         output.titleID + "\nNCA: " + output.ncaFile +
                         "\nModules: " + output.modules.joined(separator: ", ") +
                         "\nSaved in Files > On My iPhone > nx18 > nx18-native-input"
-                    status = "ExeFS extracted. Native ARM64 rewriting and IPA signing still required."
+                    status = "ExeFS and SHA-256 manifest exported. Next: run scripts/continue-native18.ps1 on Windows to rewrite game code."
                     busy = false
                 }
             } catch {

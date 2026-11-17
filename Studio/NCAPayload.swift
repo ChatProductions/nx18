@@ -1,5 +1,6 @@
 import Foundation
 import CommonCrypto
+import CryptoKit
 
 /// A local keyset. Only prederived keys from the owner's own prod.keys are used;
 /// key values are never written to disk or copied into an inspection report.
@@ -336,6 +337,42 @@ enum NCAPayload {
             guard signature == Array("NSO0".utf8) else {
                 throw NCAPayloadError.invalid("Decrypted ExeFS main is not an NSO0 executable")
             }
+            // Forward the exported modules into the existing Windows native
+            // rewriter without guessing their title or trusting stale files.
+            // SHA-256 is streamed in 1 MiB chunks so a large NSO never needs
+            // to be held in RAM. NEVER include prod.keys or title keys here.
+            var fileRecords: [[String: Any]] = []
+            for (name, _, size) in files {
+                let input = try FileHandle(forReadingFrom: destination.appendingPathComponent(name))
+                defer { try? input.close() }
+                var hasher = CryptoKit.SHA256()
+                var readBytes: UInt64 = 0
+                while let chunk = try input.read(upToCount: 1024 * 1024), !chunk.isEmpty {
+                    hasher.update(data: chunk)
+                    readBytes += UInt64(chunk.count)
+                }
+                guard readBytes == size else {
+                    throw NCAPayloadError.invalid("Exported file size changed: \(name)")
+                }
+                fileRecords.append([
+                    "name": name,
+                    "size_bytes": size,
+                    "sha256": hasher.finalize().map { String(format: "%02x", $0) }.joined()
+                ])
+            }
+            let exportManifest: [String: Any] = [
+                "schema_version": 1,
+                "stage": "decrypted-exefs",
+                "title_id": title,
+                "nca_file": nca.name,
+                "files": fileRecords,
+                "keys_embedded": false,
+                "gameplay_verified": false
+            ]
+            let encoded = try JSONSerialization.data(withJSONObject: exportManifest,
+                options: [.prettyPrinted, .sortedKeys])
+            try encoded.write(to: destination.appendingPathComponent("nx18-export.json"),
+                              options: .atomic)
             completed = true
             return Export(titleID: title, ncaFile: nca.name,
                           modules: files.map { $0.0 }, destination: destination)

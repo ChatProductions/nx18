@@ -110,3 +110,30 @@ The milestone after source-level loader integration is a **successful
 compilation of the actual Metal3 native host**, followed by staging the
 actual Terminator graphics assets and game profile—not another independent
 inspection application.
+
+
+## Continuation from NX18 on-device ExeFS (first automated handoff)
+
+The iPhone extraction stage saves each decrypted ExeFS file and a
+`nx18-export.json` sidecar containing the NCA title ID, filename, file size
+and streaming SHA-256. No encryption keys are written to the sidecar.
+Copy the **whole** export folder from the app's Files container to your
+own Windows computer, then from the NX18 repository run:
+
+```powershell
+.\scripts\continue-native18.ps1 -ExeFS "D:\NX18\iPhoneExport"
+```
+
+This invokes setup if needed, verifies the source/title/checksums, runs the
+actual upstream ARM64 NSO rewriter, and creates the iOS 17 Guest.framework.
+The results are under `work\native-from-phone\rewrite` and
+`work\native-from-phone\native` with `pipeline-report.json`.
+
+For older extracted folders without a sidecar, specify the known game's
+title ID explicitly: `-TitleId 0100B51020B68000`.
+
+**Important limitation:** iOS does not allow a sideloaded app to load
+arbitrarily generated unsigned native code. The Windows process builds
+native game code, not a directly launchable IPA. ROMFS, legacy Metal 3
+shader translation, packaging and full nested code signing remain distinct
+later gates. No game files should be committed to a public repository.
