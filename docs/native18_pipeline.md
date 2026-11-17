@@ -121,7 +121,7 @@ Copy the **whole** export folder from the app's Files container to your
 own Windows computer, then from the NX18 repository run:
 
 ```powershell
-.\scripts\continue-native18.ps1 -ExeFS "D:\NX18\iPhoneExport"
+powershell -ExecutionPolicy Bypass -File .\scripts\continue-native18.ps1 -ExeFS "D:\NX18\iPhoneExport"
 ```
 
 This invokes setup if needed, verifies the source/title/checksums, runs the

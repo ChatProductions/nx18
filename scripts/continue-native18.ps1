@@ -23,5 +23,9 @@ if ($TitleId) { $arguments += @("--title-id", $TitleId) }
 if ($VerifyOnly) { $arguments += "--verify-only" }
 & python @arguments
 if ($LASTEXITCODE -ne 0) { throw "NX18 native continuation failed" }
-Write-Host "NX18 continuation finished. See $Output\pipeline-report.json for the actual stage."
+if ($VerifyOnly) {
+    Write-Host "NX18 ExeFS checksum and NSO verification passed; no conversion ran."
+    return
+}
+Write-Host "NX18 native continuation finished. See $Output\pipeline-report.json for the actual stage."
 Write-Host "Guest.framework is native ARM64 code, NOT a playable or signed IPA."
