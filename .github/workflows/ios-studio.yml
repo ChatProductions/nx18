@@ -29,6 +29,10 @@ jobs:
         run: |
           swiftc -parse-as-library Studio/NSPInspector.swift Studio/NSPExtractor.swift Studio/NCAHeader.swift Studio/NCAPayload.swift Tests/InspectorSmoke.swift -o /tmp/nx18-inspector-smoke
           /tmp/nx18-inspector-smoke
+      - name: Test encrypted NCA3 to real ExeFS payload extraction
+        run: |
+          swiftc -parse-as-library Studio/NSPInspector.swift Studio/NCAHeader.swift Studio/NCAPayload.swift Tests/NCAPayloadSmoke.swift -o /tmp/nx18-nca-smoke
+          /tmp/nx18-nca-smoke
       - name: Test CPU BC1/BC3 fallback
         run: |
           swiftc -parse-as-library Runtime/BCDecode.swift Tests/BCSmoke.swift -o /tmp/nx18-bc-smoke
