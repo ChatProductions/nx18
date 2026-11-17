@@ -549,8 +549,10 @@ void *nx18_make_nsp_studio_root(void);
         "import SwiftUI\nimport Foundation\nimport UniformTypeIdentifiers\n\n" +
         studio_entry[studio_entry.index(view_anchor):], encoding="utf-8")
     for filename in ("NSPInspector.swift", "NSPExtractor.swift",
-                     "NCAHeader.swift", "NCAPayload.swift", "MetalProbe.swift"):
-        shutil.copyfile(studio / filename, sources / ("NX18" + filename))
+                     "NCAHeader.swift", "NCAPayload.swift", "MetalProbe.swift",
+                     "NX18DocumentPicker.swift"):
+        destination = filename if filename.startswith("NX18") else "NX18" + filename
+        shutil.copyfile(studio / filename, sources / destination)
     shutil.copyfile(HERE.parent / "Runtime/BCDecode.swift",
                     sources / "NX18BCDecode.swift")
     shutil.copyfile(HERE / "NX18Import.swift",

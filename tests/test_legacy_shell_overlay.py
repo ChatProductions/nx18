@@ -158,10 +158,18 @@ if (fabs((dw / dh) / ((double)cw / ch) - 1) < 0.01) vp = (MTLViewport){0, 0, dw,
         self.assertIn("struct StudioView: View", view)
         self.assertNotIn("@main", view)
         self.assertIn("NSPInspector.inspect(url:", view)
+        self.assertIn('NX18DocumentPicker.open(', view)
+        self.assertIn('NSP-Inbox', view)
+        self.assertIn('refreshNSPInbox()', view)
+        self.assertNotIn('.fileImporter(', view)
+        native_picker = (sources / "NX18DocumentPicker.swift").read_text()
+        self.assertIn("UIDocumentPickerViewController", native_picker)
+        self.assertIn("func documentPicker(", native_picker)
+        self.assertIn("UIApplication.shared.connectedScenes", native_picker)
         for filename in ("NX18Import.swift", "NX18NSPInspector.swift",
                          "NX18NSPExtractor.swift", "NX18NCAHeader.swift",
                          "NX18MetalProbe.swift", "NX18BCDecode.swift",
-                         "NX18NCAPayload.swift"):
+                         "NX18NCAPayload.swift", "NX18DocumentPicker.swift"):
             self.assertTrue((sources / filename).is_file(), filename)
         menu = (self.legacy / "dm/ios/Sources/GameMenu.swift").read_text()
         self.assertNotIn("dm_quit_menu()", menu)

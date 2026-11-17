@@ -14,14 +14,14 @@ struct NX18App: App {
 }
 
 struct StudioView: View {
-    @State private var showingImporter = false
+    @State private var localNSPs: [URL] = []
+    @State private var inboxStatus = "Checking local NSP-Inbox…"
     @State private var busy = false
     @State private var status = "No NSP imported."
     @State private var report = ""
     @State private var inspectedURL: URL?
     @State private var inspectedIndex: NSPIndex?
     @State private var metalStatus = "Not tested on this device."
-    @State private var showingKeyImporter = false
     @State private var switchKeys: SwitchKeys?
     @State private var keyStatus = "No header key imported."
 
@@ -50,13 +50,54 @@ struct StudioView: View {
                     }
 
                     Button {
-                        showingImporter = true
+                        status = "Opening UIKit Files picker…"
+                        NX18DocumentPicker.open(
+                            didSelect: { url in inspect(url) },
+                            didCancel: { status = "NSP selection cancelled." },
+                            didFail: { reason in status = "Files picker: " + reason }
+                        )
                     } label: {
-                        Label("Inspect NSP on this iPhone", systemImage: "doc.text.magnifyingglass")
+                        Label("Choose NSP using Files", systemImage: "doc.text.magnifyingglass")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(busy)
+
+                    GroupBox("NSP-Inbox: works without a file picker") {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Move your .nsp into Files → On My iPhone → nx18 → NSP-Inbox. Then tap Refresh below.")
+                                .font(.footnote)
+                            Button {
+                                refreshNSPInbox()
+                            } label: {
+                                Label("Refresh NSP-Inbox", systemImage: "arrow.clockwise")
+                            }
+                            .buttonStyle(.bordered)
+                            .disabled(busy)
+
+                            if localNSPs.isEmpty {
+                                Text(inboxStatus)
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                ForEach(localNSPs, id: \.path) { game in
+                                    Button {
+                                        inspect(game)
+                                    } label: {
+                                        Label(game.lastPathComponent, systemImage: "shippingbox")
+                                            .lineLimit(2)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .disabled(busy)
+                                }
+                                Text(inboxStatus)
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
 
                     if busy {
                         ProgressView("Processing on this iPhone…")
@@ -76,7 +117,12 @@ struct StudioView: View {
                             .foregroundStyle(.secondary)
 
                         Button {
-                            showingKeyImporter = true
+                            keyStatus = "Opening native Files picker for your key file…"
+                            NX18DocumentPicker.open(
+                                didSelect: { url in loadKeys(url) },
+                                didCancel: { keyStatus = "Key selection cancelled." },
+                                didFail: { reason in keyStatus = "Key picker: " + reason }
+                            )
                         } label: {
                             Label("Load prod.keys locally", systemImage: "key")
                         }
@@ -155,18 +201,47 @@ struct StudioView: View {
                 .padding(20)
             }
             .navigationBarTitleDisplayMode(.inline)
-            .fileImporter(isPresented: $showingImporter, allowedContentTypes: [.item]) { result in
-                switch result {
-                case .success(let url): inspect(url)
-                case .failure(let error): status = "File picker: " + error.localizedDescription
+            .onAppear { refreshNSPInbox() }
+        }
+    }
+
+    private func refreshNSPInbox() {
+        let manager = FileManager.default
+        let documents = manager.urls(for: .documentDirectory,
+                                      in: .userDomainMask)[0]
+        let inbox = documents.appendingPathComponent("NSP-Inbox", isDirectory: true)
+        do {
+            try manager.createDirectory(at: inbox, withIntermediateDirectories: true)
+            let guide = inbox.appendingPathComponent("PUT_NSP_FILES_HERE.txt")
+            if !manager.fileExists(atPath: guide.path) {
+                try "Move your own base-game .nsp here, then open NX18 and tap Refresh NSP-Inbox.\nNo RomFS extraction is needed just to select the NSP.\n"
+                    .write(to: guide, atomically: true, encoding: .utf8)
+            }
+            // Allow files in the app's Documents root, too. No game archive
+            // needs to be opened via a system file picker.
+            let possible = [inbox, documents]
+            var found: [URL] = []
+            for directory in possible {
+                let contents = try manager.contentsOfDirectory(at: directory,
+                    includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey],
+                    options: [.skipsHiddenFiles])
+                for url in contents where url.pathExtension.lowercased() == "nsp" {
+                    let resource = try url.resourceValues(
+                        forKeys: [.isRegularFileKey, .fileSizeKey])
+                    if resource.isRegularFile == true &&
+                       (resource.fileSize ?? 0) >= 16 {
+                        found.append(url)
+                    }
                 }
             }
-            .fileImporter(isPresented: $showingKeyImporter, allowedContentTypes: [.item]) { result in
-                switch result {
-                case .success(let url): loadKeys(url)
-                case .failure(let error): keyStatus = "Key picker: " + error.localizedDescription
-                }
-            }
+            localNSPs = found.sorted { $0.lastPathComponent.localizedStandardCompare(
+                $1.lastPathComponent) == .orderedAscending }
+            inboxStatus = localNSPs.isEmpty
+                ? "No .nsp found yet. Copy it into the NSP-Inbox in Files, then refresh."
+                : "Found \(localNSPs.count) local NSP file(s). Tap one to inspect it."
+        } catch {
+            localNSPs = []
+            inboxStatus = "Cannot access NSP-Inbox: " + error.localizedDescription
         }
     }
 
