@@ -76,7 +76,7 @@ from pathlib import Path
 import re, sys
 lines = Path(sys.argv[1]).read_text(errors="replace").splitlines()
 errors = [i for i, line in enumerate(lines)
-          if re.search(r"(?<!warning: )error:|fatal error:", line)]
+          if re.search(r"(?<!warning: )error:|fatal error:|duplicate symbol|undefined symbol|^ld:", line)]
 print("nx18: compiler errors: " + str(len(errors)), file=sys.stderr)
 for index in errors[:12]:
     for line in lines[max(0, index - 3):min(len(lines), index + 5)]:

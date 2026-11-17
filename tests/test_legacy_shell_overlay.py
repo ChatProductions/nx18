@@ -230,6 +230,16 @@ int dm_game_imports(const char *prefix) {
         with self.assertRaisesRegex(RuntimeError, "semantics changed"):
             apply(self.legacy, self.shell)
 
+    def test_upstream_classic_graphics_quit_is_not_duplicated(self):
+        nvn = self.legacy / "dm/gfx/nvn/legacy/hle_nvn.c.inc"
+        self._write(nvn, """void dm_gfx_quit_begin(void) {}
+void dm_gfx_quit(int wait_ms) { if (wait_ms > 0) mtl_warm_wait(wait_ms); }
+""")
+        apply(self.legacy, self.shell)
+        lifecycle = (self.legacy / "dm/host/hle_lifecycle.c").read_text()
+        self.assertNotIn("void dm_gfx_quit_begin(", lifecycle)
+        self.assertNotIn("void dm_gfx_quit(int budget_ms)", lifecycle)
+
     def test_upstream_present_progress_not_duplicated(self):
         renderer = self.legacy / "dm/gfx/nvn/legacy/nvn_mtl_legacy.inc"
         renderer.write_text(renderer.read_text() + """

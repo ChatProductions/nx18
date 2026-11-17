@@ -370,8 +370,23 @@ void dm_gfx_quit(int budget_ms) {
 }
 #endif
 """
-    lifecycle.write_text(life_src.replace(life_anchor, life_anchor + life_bridge, 1),
-                         encoding="utf-8")
+    nvn_impl = legacy / "dm/gfx/nvn/legacy/hle_nvn.c.inc"
+    has_upstream_lifecycle = False
+    if nvn_impl.is_file():
+        upstream_quit = nvn_impl.read_text(encoding="utf-8")
+        has_begin = "void dm_gfx_quit_begin(void)" in upstream_quit
+        has_wait = "void dm_gfx_quit(int " in upstream_quit
+        if has_begin != has_wait:
+            raise RuntimeError("incomplete upstream Metal3 shutdown ABI")
+        has_upstream_lifecycle = has_begin and has_wait
+        if has_upstream_lifecycle and "mtl_warm_wait(" not in upstream_quit:
+            raise RuntimeError("upstream graphics shutdown semantics changed")
+    if not has_upstream_lifecycle:
+        lifecycle.write_text(life_src.replace(life_anchor, life_anchor + life_bridge, 1),
+                             encoding="utf-8")
+    # If the upstream classic NVN interface now owns these functions,
+    # retain it verbatim. The fallback is for older upstream revisions only;
+    # duplicate implementations cause a genuine arm64 linker error.
 
     # The newer vi::ListFrameHistory service reads queued/completed
     # presentation ticket counts. The legacy Metal3 renderer already owns
