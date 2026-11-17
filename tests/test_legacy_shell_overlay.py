@@ -41,6 +41,9 @@ static char *g_argv[4]; static int g_argc;
         return;
     }
 }
+UIViewController *front_ios_root(void) {
+    return [DmRootVC new];
+}
 """)
         self._write(self.legacy / "dm/ios/Sources/Launcher.swift",
                     'if #available(iOS 26.0, *) { button.buttonStyle(.glassProminent) } else { button.buttonStyle(.borderedProminent) }\n'
