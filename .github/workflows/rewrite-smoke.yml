@@ -74,13 +74,38 @@ jobs:
           print("Fixture:", target / "main")
           '@ | python -
           if ($LASTEXITCODE -ne 0) { throw "Fixture generation failed" }
+      - name: Record iPhone-style ExeFS title and SHA-256 provenance locally
+        shell: pwsh
+        run: |
+          @'
+          import hashlib, json
+          from pathlib import Path
+          folder = Path("work/synthetic/exefs")
+          main = folder / "main"
+          assert main.read_bytes()[:4] == b"NSO0"
+          manifest = {
+              "schema_version": 1,
+              "stage": "decrypted-exefs",
+              "title_id": "0100B51020B68000",
+              "nca_file": "synthetic.nca",
+              "files": [{
+                  "name": "main",
+                  "size_bytes": main.stat().st_size,
+                  "sha256": hashlib.sha256(main.read_bytes()).hexdigest(),
+              }],
+              "keys_embedded": False,
+              "gameplay_verified": False,
+          }
+          (folder / "nx18-export.json").write_text(json.dumps(manifest, indent=2))
+          print("Synthetic iPhone-style export bound to exact NSO bytes and title")
+          '@ | python -
+          if ($LASTEXITCODE -ne 0) { throw "Cannot generate local test export manifest" }
       - name: Continue exported ExeFS through real rewriter and Guest framework
         run: >
           python tools/continue_native18.py
           work/synthetic/exefs
           --upstream vendor/nxnative
           --output work/native-from-phone
-          --title-id 0100B51020B68000
           --jobs 2
       - name: Verify framework Mach-O targets iOS17, not 26
         shell: pwsh
