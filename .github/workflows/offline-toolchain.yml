@@ -1,0 +1,57 @@
+name: Export offline Linux native rewrite toolchain
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/offline-toolchain.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  public-tools-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download public upstream nxnative source and Python wheels
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv /tmp/nx18-pip
+          /tmp/nx18-pip/bin/python -m pip download \
+            --disable-pip-version-check --only-binary=:all: \
+            -d offline/wheels 'capstone>=5.0,<6.0' 'lz4>=4.0,<5.0'
+          git clone --depth 1 --branch ios16-ios17-compat \
+            https://github.com/widmonstertony/nxnative.git \
+            offline/vendor/nxnative
+          git clone --depth 1 --branch main \
+            https://github.com/xinerqu/ns2ios-shell.git \
+            offline/vendor/shell
+          test -s offline/vendor/nxnative/dm/tools/patch_nso.py
+          test -s offline/vendor/shell/dm/tools/guest_dylib.py
+          rm -rf offline/vendor/nxnative/.git offline/vendor/shell/.git
+      - name: Assemble public toolchain archive, including NX18 scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p offline/nx18/tools offline/nx18/LegacyShell offline/nx18/tests
+          cp tools/*.py offline/nx18/tools/
+          cp LegacyShell/*.py offline/nx18/LegacyShell/
+          cp -r LegacyShell/NX18Guest.m offline/nx18/LegacyShell/
+          cp -r LegacyShell/build_shell18.sh offline/nx18/LegacyShell/
+          cp -r tests/test_continue_native18.py offline/nx18/tests/
+          echo "PUBLIC SOURCE + PYPI WHEELS ONLY. NO NINTENDO GAME DATA OR KEYS." > offline/README.txt
+          find offline/wheels -maxdepth 1 -name '*.whl' -printf '%f\n'
+          tar -czf nx18-offline-rewriter-linux.tar.gz -C offline .
+          sha256sum nx18-offline-rewriter-linux.tar.gz > nx18-offline-rewriter-linux.sha256
+          ls -lh nx18-offline-rewriter-linux.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nx18-offline-native-rewriter-public-tools-only
+          path: |
+            nx18-offline-rewriter-linux.tar.gz
+            nx18-offline-rewriter-linux.sha256
+          retention-days: 7
