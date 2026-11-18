@@ -32,6 +32,20 @@ jobs:
             offline/vendor/shell
           test -s offline/vendor/nxnative/dm/tools/patch_nso.py
           test -s offline/vendor/shell/dm/tools/guest_dylib.py
+          # Keep only the generic NSO rewriter and Python patch profiles.
+          # Shader maps and unrelated game assets add hundreds of MB and
+          # are not needed for this offline CPU-only rewriting stage.
+          cp offline/vendor/shell/dm/tools/guest_dylib.py /tmp/nx18_guest_dylib.py
+          rm -rf offline/vendor/shell
+          mkdir -p offline/vendor/shell/dm/tools
+          cp /tmp/nx18_guest_dylib.py offline/vendor/shell/dm/tools/guest_dylib.py
+          find offline/vendor/nxnative -mindepth 1 -maxdepth 1 ! -name dm -exec rm -rf {} +
+          find offline/vendor/nxnative/dm -mindepth 1 -maxdepth 1 \
+            ! -name tools ! -name games -exec rm -rf {} +
+          find offline/vendor/nxnative/dm/games -type f \
+            ! -name '*.py' ! -name 'game.tsv' -delete
+          find offline/vendor/nxnative/dm/games -type d -empty -delete
+          rm -rf offline/vendor/nxnative/dm/tools/nx_extract_bin
           rm -rf offline/vendor/nxnative/.git offline/vendor/shell/.git
       - name: Assemble public toolchain archive, including NX18 scripts
         shell: bash
